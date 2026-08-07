@@ -128,6 +128,27 @@ backgroundImage:{
     100% { transform: scale(1); box-shadow: 0 0 0 14px rgba(123,13,30,0); }
   }
   .add-pulse { animation: addPulse 0.5s ease; }
+
+  @keyframes cardAddedPulse {
+    0%   { transform: scale(1); box-shadow: 0 0 0 0 rgba(212,175,55,0); }
+    35%  { transform: scale(1.035); box-shadow: 0 0 0 4px rgba(212,175,55,0.55), 0 20px 40px -12px rgba(123,13,30,0.35); }
+    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(212,175,55,0); }
+  }
+  .card-added { animation: cardAddedPulse 0.6s ease; z-index: 5; position: relative; }
+
+  .card-added-check {
+    transition: opacity 0.25s ease;
+  }
+  .card-added-check.show-check {
+    animation: cardCheckFade 0.7s ease;
+  }
+  @keyframes cardCheckFade {
+    0%   { opacity: 0; transform: scale(0.7); }
+    20%  { opacity: 1; transform: scale(1.05); }
+    30%  { transform: scale(1); }
+    75%  { opacity: 1; }
+    100% { opacity: 0; }
+  }
   .fly-img {
     position: fixed; z-index: 9999; border-radius: 9999px; object-fit: cover; pointer-events: none;
     box-shadow: 0 0 0 3px #D4AF37, 0 10px 30px -6px rgba(0,0,0,0.4);
@@ -468,13 +489,6 @@ backgroundImage:{
       <button class="btn-shine bg-gold-gradient text-maroon-dark font-label text-sm font-bold uppercase tracking-widest py-2.5 px-6 sm:py-4 sm:px-10 rounded-full shadow-gold hover:-translate-y-0.5 transition-transform w-max banner-cta text-xs sm:text-sm" data-cat="Sacred Herbs">Shop Herbs</button>
     </div>
   </div>
-
-  <button id="bannerPrev" class="absolute left-5 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-ivory/15 backdrop-blur-sm ring-1 ring-gold/40 flex items-center justify-center text-ivory hover:bg-gold hover:text-maroon-dark transition-colors z-20">
-    <span class="material-symbols-outlined">chevron_left</span>
-  </button>
-  <button id="bannerNext" class="absolute right-5 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-ivory/15 backdrop-blur-sm ring-1 ring-gold/40 flex items-center justify-center text-ivory hover:bg-gold hover:text-maroon-dark transition-colors z-20">
-    <span class="material-symbols-outlined">chevron_right</span>
-  </button>
 
   <div class="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2.5 z-20" id="bannerDots">
     <button class="banner-dot active" data-slide="0"></button>
@@ -1101,6 +1115,9 @@ function productCard(p){
     <div class="h-28 sm:h-44 md:h-52 overflow-hidden relative cursor-pointer view-btn" data-id="${p.id}">
       <img src="${p.img}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"/>
       <div class="absolute inset-0 bg-gradient-to-t from-maroon-dark/40 via-transparent to-transparent"></div>
+      <div class="card-added-check absolute inset-0 flex items-center justify-center bg-maroon-dark/50 opacity-0 pointer-events-none">
+        <span class="material-symbols-outlined text-gold-light text-[36px] sm:text-[44px]">check_circle</span>
+      </div>
     </div>
     <div class="p-2.5 sm:p-4 md:p-5">
       <span class="text-[8px] sm:text-[10px] font-label font-bold text-copper uppercase tracking-widest">${p.cat}</span>
@@ -1120,6 +1137,7 @@ function wireAddButtons(root){
       flyToCart(btn);
       addToCart(Number(btn.dataset.id));
       pulseButton(btn);
+      pulseCard(btn);
     });
   });
   root.querySelectorAll('.view-btn').forEach(el=>{
@@ -1132,10 +1150,30 @@ function pulseButton(btn){
   btn.classList.add('add-pulse');
   setTimeout(()=>btn.classList.remove('add-pulse'), 500);
 }
+function pulseCard(btn){
+  const card = btn.closest('.product-card');
+  if(!card) return;
+  card.classList.remove('card-added');
+  void card.offsetWidth;
+  card.classList.add('card-added');
+  const check = card.querySelector('.card-added-check');
+  if(check){
+    check.classList.remove('show-check');
+    void check.offsetWidth;
+    check.classList.add('show-check');
+    setTimeout(()=>check.classList.remove('show-check'), 700);
+  }
+  setTimeout(()=>card.classList.remove('card-added'), 650);
+}
 function flyToCart(btn){
-  const cartBtn = document.getElementById('cartBtn');
   const card = btn.closest('.group');
   const img = card ? card.querySelector('img') : null;
+  if(!img) return;
+  flyImageToCart(img);
+}
+
+function flyImageToCart(img){
+  const cartBtn = document.getElementById('cartBtn');
   if(!img || !cartBtn) return;
   const imgRect = img.getBoundingClientRect();
   const cartRect = cartBtn.getBoundingClientRect();
@@ -1457,7 +1495,8 @@ document.getElementById('pdAddBtn').addEventListener('click',(e)=>{
   renderCart();
   const p = PRODUCTS.find(pp=>pp.id===currentProductId);
   if(p) showToast(pdQty + ' × ' + p.name + ' added to cart');
-  burstAtCart();
+  flyImageToCart(document.getElementById('pdImage'));
+  pulseButton(document.getElementById('pdAddBtn'));
 });
 document.getElementById('pdBuyNowBtn').addEventListener('click',()=>{
   if(currentProductId==null) return;
@@ -1847,14 +1886,34 @@ document.getElementById('homeNewsletterBtn').addEventListener('click',()=>{
     clearInterval(timer);
     timer = setInterval(next, 5000);
   }
-  document.getElementById('bannerNext').addEventListener('click',()=>{ next(); startAuto(); });
-  document.getElementById('bannerPrev').addEventListener('click',()=>{ prev(); startAuto(); });
   dots.forEach(dot=>{
     dot.addEventListener('click',()=>{ goTo(Number(dot.dataset.slide)); startAuto(); });
   });
   document.querySelectorAll('.banner-cta').forEach(btn=>{
     btn.addEventListener('click',()=>filterCat(btn.dataset.cat));
   });
+
+  // Swipe support (touch) — mobile-first navigation instead of arrow buttons
+  const container = document.getElementById('bannerSlideshow');
+  let touchStartX = 0, touchStartY = 0, touchDeltaX = 0, isSwiping = false;
+  container.addEventListener('touchstart', (e)=>{
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    touchDeltaX = 0;
+    isSwiping = true;
+  }, { passive: true });
+  container.addEventListener('touchmove', (e)=>{
+    if(!isSwiping) return;
+    touchDeltaX = e.touches[0].clientX - touchStartX;
+  }, { passive: true });
+  container.addEventListener('touchend', ()=>{
+    if(!isSwiping) return;
+    isSwiping = false;
+    const threshold = 40;
+    if(touchDeltaX <= -threshold){ next(); startAuto(); }
+    else if(touchDeltaX >= threshold){ prev(); startAuto(); }
+  });
+
   startAuto();
 })();
 
