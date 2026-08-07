@@ -45,7 +45,24 @@ backgroundImage:{
 }}}
 </script>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.gstatic.com" rel="preconnect" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;0,9..144,700;0,9..144,800;1,9..144,600&display=swap" rel="stylesheet"/>
+<script>
+  // Reveal Material Symbols icons only once the icon font has actually loaded,
+  // to avoid showing raw ligature text (e.g. "local_shipping") on slow connections.
+  if (document.fonts && document.fonts.load) {
+    Promise.all([
+      document.fonts.load('24px "Material Symbols Outlined"'),
+      document.fonts.ready
+    ]).then(function(){
+      document.documentElement.classList.add('fonts-loaded');
+    }).catch(function(){
+      document.documentElement.classList.add('fonts-loaded');
+    });
+  } else {
+    document.documentElement.classList.add('fonts-loaded');
+  }
+</script>
 <style>
   html,body{margin:0;padding:0;scroll-behavior:smooth;}
   ::-webkit-scrollbar{display:none;}
@@ -57,8 +74,18 @@ backgroundImage:{
     from{ opacity:0; transform:translateY(18px); }
     to{ opacity:1; transform:translateY(0); }
   }
-  .material-symbols-outlined{font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24;}
+  .material-symbols-outlined{
+    font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+  }
+  html.fonts-loaded .material-symbols-outlined{ opacity: 1; }
+  /* fallback: if JS fails for any reason, still reveal icons after a short delay */
+  html:not(.fonts-loaded) .material-symbols-outlined{ animation: revealIconsFallback 0s 1.2s forwards; }
+  @keyframes revealIconsFallback{ to{ opacity: 1; } }
   body{background:#FFFAF0;}
+  input, textarea, select { outline: none; }
+  input:focus, textarea:focus, select:focus { outline: none; box-shadow: none; }
 
   /* ornamental divider */
   .ornament{display:flex;align-items:center;gap:12px;}
@@ -145,6 +172,15 @@ backgroundImage:{
 
   .fade-in{animation:fadeIn 0.6s ease both;}
   @keyframes fadeIn{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+
+  @keyframes shakeErr{
+    0%,100%{ transform:translateX(0); }
+    20%{ transform:translateX(-6px); }
+    40%{ transform:translateX(6px); }
+    60%{ transform:translateX(-4px); }
+    80%{ transform:translateX(4px); }
+  }
+  .shake{ animation:shakeErr 0.4s ease; }
 
   /* banner slideshow */
   #bannerSlideshow{ background:#2B0208; }
@@ -288,6 +324,48 @@ backgroundImage:{
 
 <div id="toast"><span class="material-symbols-outlined text-[18px]">check_circle</span><span id="toastText">Added to cart</span></div>
 
+<!-- OTP AUTH MODAL -->
+<div id="otpModalOverlay" class="hidden fixed inset-0 z-[9990] bg-maroon-dark/70 backdrop-blur-sm flex items-center justify-center px-4">
+<div id="otpModalCard" class="bg-ivory rounded-2xl shadow-premium ring-1 ring-gold/30 w-full max-w-sm p-6 sm:p-8 relative">
+<button id="otpModalClose" class="absolute top-4 right-4 text-ink-soft hover:text-maroon">
+<span class="material-symbols-outlined text-[22px]">close</span>
+</button>
+
+<div class="flex flex-col items-center text-center mb-5 sm:mb-6">
+<div class="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gold-gradient flex items-center justify-center shadow-gold mb-3">
+<span class="material-symbols-outlined text-maroon-dark text-[22px] sm:text-[26px]">smartphone</span>
+</div>
+<h2 class="font-display text-lg sm:text-xl text-maroon font-semibold">Verify Your Number</h2>
+<p class="font-body text-xs sm:text-sm text-ink-soft mt-1">Quick verification before checkout</p>
+</div>
+
+<!-- Step 1: phone entry -->
+<div id="otpStepPhone">
+<label class="font-label text-[10px] sm:text-xs font-bold text-ink-soft uppercase tracking-wide">Mobile Number</label>
+<div class="flex items-center bg-cream border-b-2 border-gold/30 focus-within:border-maroon rounded-t-lg mt-1.5 mb-4 sm:mb-5">
+<span class="px-3 py-2.5 sm:py-3 text-sm text-ink-soft font-label border-r border-gold/20">+91</span>
+<input id="otpPhoneInput" type="tel" maxlength="10" inputmode="numeric" class="flex-1 bg-transparent px-3 py-2.5 sm:py-3 text-sm sm:text-base focus:outline-none text-ink" placeholder="98765 43210"/>
+</div>
+<p id="otpPhoneError" class="hidden text-xs text-maroon-light font-label font-semibold mb-3">Please enter a valid 10-digit mobile number.</p>
+<button id="otpSendBtn" class="btn-shine w-full bg-maroon-gradient text-ivory font-label text-xs sm:text-sm font-bold uppercase tracking-widest py-3 sm:py-3.5 rounded-full shadow-premium hover:-translate-y-0.5 transition-transform">Send OTP</button>
+</div>
+
+<!-- Step 2: otp entry -->
+<div id="otpStepCode" class="hidden">
+<p class="font-body text-xs sm:text-sm text-ink-soft mb-1">Enter the 6-digit code sent to <span id="otpPhoneDisplay" class="font-semibold text-ink"></span></p>
+<p class="font-label text-[10px] sm:text-xs text-copper font-bold mb-4 sm:mb-5 bg-cream inline-block px-2.5 py-1 rounded-full">Demo code: <span id="otpDemoCode"></span></p>
+<input id="otpCodeInput" type="text" maxlength="6" inputmode="numeric" class="w-full bg-cream border-b-2 border-gold/30 focus:border-maroon rounded-t-lg px-3 py-2.5 sm:py-3 text-center text-lg sm:text-xl tracking-[0.5em] font-label font-bold text-ink focus:outline-none mb-3" placeholder="------"/>
+<p id="otpCodeError" class="hidden text-xs text-maroon-light font-label font-semibold mb-3">Incorrect code. Please try again.</p>
+<button id="otpVerifyBtn" class="btn-shine w-full bg-maroon-gradient text-ivory font-label text-xs sm:text-sm font-bold uppercase tracking-widest py-3 sm:py-3.5 rounded-full shadow-premium hover:-translate-y-0.5 transition-transform mb-3">Verify & Continue</button>
+<div class="flex items-center justify-between">
+<button id="otpChangeNumber" class="font-label text-[11px] sm:text-xs font-bold text-ink-soft hover:text-maroon uppercase tracking-wide">Change Number</button>
+<button id="otpResendBtn" class="font-label text-[11px] sm:text-xs font-bold text-copper hover:text-maroon uppercase tracking-wide">Resend OTP</button>
+</div>
+</div>
+
+</div>
+</div>
+
 <div id="promoBanner" class="fixed top-0 w-full z-[51] bg-maroon-gradient text-ivory overflow-hidden h-9 flex items-center border-b border-gold/30">
 <div class="ticker-track flex items-center gap-16 whitespace-nowrap font-label text-xs font-semibold tracking-wide">
 <span class="flex items-center gap-2"><span class="material-symbols-outlined text-[15px] text-gold-light">local_shipping</span> Free shipping on orders above ₹999</span>
@@ -310,14 +388,21 @@ backgroundImage:{
 <a class="nav-link font-label text-[13px] font-semibold text-ink-soft hover:text-maroon transition-colors uppercase tracking-wider" data-page="shop" href="#">Shop</a>
 <a class="nav-link font-label text-[13px] font-semibold text-ink-soft hover:text-maroon transition-colors uppercase tracking-wider" data-page="about" href="#">About Us</a>
 <a class="nav-link font-label text-[13px] font-semibold text-ink-soft hover:text-maroon transition-colors uppercase tracking-wider" data-page="contact" href="#">Contact</a>
+<a class="nav-link font-label text-[13px] font-semibold text-ink-soft hover:text-maroon transition-colors uppercase tracking-wider" data-page="orders" href="#">My Orders</a>
 </nav>
 <div class="flex items-center gap-3 md:gap-5">
-<div class="hidden md:flex items-center bg-cream rounded-full px-4 py-2.5 ring-1 ring-gold/30 focus-within:ring-gold/70 transition-all">
+<div class="hidden md:block relative">
+<div class="flex items-center bg-cream rounded-full px-4 py-2.5 ring-1 ring-gold/30 focus-within:ring-gold/70 transition-all">
 <span class="material-symbols-outlined text-copper text-[19px]">search</span>
-<input id="searchBox" class="bg-transparent border-none focus:ring-0 text-sm ml-2 w-40 text-ink font-body placeholder:text-ink-soft/60" placeholder="Search the sacred..." type="text"/>
+<input id="searchBox" autocomplete="off" class="bg-transparent border-none outline-none focus:outline-none focus:ring-0 focus:border-none text-sm ml-2 w-40 text-ink font-body placeholder:text-ink-soft/60" placeholder="Search the sacred..." type="text"/>
+</div>
+<div id="searchDropdown" class="hidden absolute top-full mt-2 right-0 w-80 bg-ivory rounded-xl shadow-premium ring-1 ring-gold/25 overflow-hidden z-50"></div>
 </div>
 <button id="mobileSearchBtn" class="md:hidden text-maroon hover:text-saffron transition-colors">
 <span class="material-symbols-outlined text-[24px]">search</span>
+</button>
+<button id="ordersBtn" class="hidden md:block text-maroon hover:text-saffron transition-colors">
+<span class="material-symbols-outlined text-[24px] md:text-[26px]">receipt_long</span>
 </button>
 <button id="cartBtn" class="relative text-maroon hover:text-saffron transition-colors">
 <span class="material-symbols-outlined text-[24px] md:text-[26px]">shopping_bag</span>
@@ -328,17 +413,19 @@ backgroundImage:{
 </button>
 </div>
 </div>
-<div id="mobileSearchBar" class="hidden xl:hidden px-margin-mobile pb-4">
+<div id="mobileSearchBar" class="hidden xl:hidden px-margin-mobile pb-4 relative">
 <div class="flex items-center bg-cream rounded-full px-4 py-2.5 ring-1 ring-gold/30 focus-within:ring-gold/70 transition-all">
 <span class="material-symbols-outlined text-copper text-[19px]">search</span>
-<input id="mobileSearchBox" class="bg-transparent border-none focus:ring-0 text-sm ml-2 w-full text-ink font-body placeholder:text-ink-soft/60" placeholder="Search the sacred..." type="text"/>
+<input id="mobileSearchBox" autocomplete="off" class="bg-transparent border-none outline-none focus:outline-none focus:ring-0 focus:border-none text-sm ml-2 w-full text-ink font-body placeholder:text-ink-soft/60" placeholder="Search the sacred..." type="text"/>
 </div>
+<div id="mobileSearchDropdown" class="hidden absolute top-full left-margin-mobile right-margin-mobile mt-2 bg-ivory rounded-xl shadow-premium ring-1 ring-gold/25 overflow-hidden z-50"></div>
 </div>
 <nav id="mobileNav" class="hidden xl:hidden flex-col border-t border-gold/15 bg-ivory">
 <a class="mobile-nav-link font-label text-sm font-semibold text-ink-soft hover:text-maroon hover:bg-cream transition-colors uppercase tracking-wider px-margin-mobile py-4 border-b border-gold/10" data-page="home" href="#">Home</a>
 <a class="mobile-nav-link font-label text-sm font-semibold text-ink-soft hover:text-maroon hover:bg-cream transition-colors uppercase tracking-wider px-margin-mobile py-4 border-b border-gold/10" data-page="shop" href="#">Shop</a>
 <a class="mobile-nav-link font-label text-sm font-semibold text-ink-soft hover:text-maroon hover:bg-cream transition-colors uppercase tracking-wider px-margin-mobile py-4 border-b border-gold/10" data-page="about" href="#">About Us</a>
-<a class="mobile-nav-link font-label text-sm font-semibold text-ink-soft hover:text-maroon hover:bg-cream transition-colors uppercase tracking-wider px-margin-mobile py-4" data-page="contact" href="#">Contact</a>
+<a class="mobile-nav-link font-label text-sm font-semibold text-ink-soft hover:text-maroon hover:bg-cream transition-colors uppercase tracking-wider px-margin-mobile py-4 border-b border-gold/10" data-page="contact" href="#">Contact</a>
+<a class="mobile-nav-link font-label text-sm font-semibold text-ink-soft hover:text-maroon hover:bg-cream transition-colors uppercase tracking-wider px-margin-mobile py-4 flex items-center gap-2" data-page="orders" href="#"><span class="material-symbols-outlined text-[18px] text-copper">receipt_long</span>My Orders</a>
 </nav>
 </header>
 
@@ -346,9 +433,8 @@ backgroundImage:{
 
 <!-- HOME PAGE -->
 <div id="page-home" class="page">
-<section class="py-14">
-<div class="max-w-container-max mx-auto px-margin-mobile lg:px-margin-desktop">
-<div class="relative rounded-2xl overflow-hidden ring-1 ring-gold/25 shadow-premium h-[400px] sm:h-[460px] lg:h-[520px]" id="bannerSlideshow">
+<section class="py-0">
+<div class="relative overflow-hidden shadow-premium h-[440px] sm:h-[560px] lg:h-[640px] w-full" id="bannerSlideshow">
 
   <div class="banner-slide active" data-slide="0">
     <img class="absolute inset-0 w-full h-full object-cover" src="https://images.unsplash.com/photo-1758903846845-e8ae224a5047?w=1200&auto=format&fit=crop&q=80" alt="Complete Yagya Kit"/>
@@ -396,7 +482,6 @@ backgroundImage:{
     <button class="banner-dot" data-slide="2"></button>
   </div>
 
-</div>
 </div>
 </section>
 
@@ -554,10 +639,10 @@ Buy Now
 
 <section class="py-8 sm:py-16 bg-cream">
 <div class="max-w-container-max mx-auto px-margin-mobile lg:px-margin-desktop grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-8 text-center">
-<div><div class="font-display text-2xl sm:text-4xl text-maroon font-semibold mb-0.5 sm:mb-1">12+</div><div class="font-label text-[10px] sm:text-xs text-copper uppercase tracking-wider font-bold">Years of Craft</div></div>
-<div><div class="font-display text-2xl sm:text-4xl text-maroon font-semibold mb-0.5 sm:mb-1">2,500+</div><div class="font-label text-[10px] sm:text-xs text-copper uppercase tracking-wider font-bold">Rituals Fulfilled</div></div>
-<div><div class="font-display text-2xl sm:text-4xl text-maroon font-semibold mb-0.5 sm:mb-1">150+</div><div class="font-label text-[10px] sm:text-xs text-copper uppercase tracking-wider font-bold">Partner Artisans</div></div>
-<div><div class="font-display text-2xl sm:text-4xl text-maroon font-semibold mb-0.5 sm:mb-1">28</div><div class="font-label text-[10px] sm:text-xs text-copper uppercase tracking-wider font-bold">States Delivered To</div></div>
+<div><div class="font-display text-2xl sm:text-4xl text-maroon font-semibold mb-0.5 sm:mb-1">100%</div><div class="font-label text-[10px] sm:text-xs text-copper uppercase tracking-wider font-bold">Sattvic Sourced</div></div>
+<div><div class="font-display text-2xl sm:text-4xl text-maroon font-semibold mb-0.5 sm:mb-1">8+</div><div class="font-label text-[10px] sm:text-xs text-copper uppercase tracking-wider font-bold">Founding Products</div></div>
+<div><div class="font-display text-2xl sm:text-4xl text-maroon font-semibold mb-0.5 sm:mb-1">5+</div><div class="font-label text-[10px] sm:text-xs text-copper uppercase tracking-wider font-bold">Partner Artisans</div></div>
+<div><div class="font-display text-2xl sm:text-4xl text-maroon font-semibold mb-0.5 sm:mb-1">Aug '26</div><div class="font-label text-[10px] sm:text-xs text-copper uppercase tracking-wider font-bold">Freshly Launched</div></div>
 </div>
 </section>
 
@@ -589,28 +674,28 @@ Buy Now
 <div class="texture-overlay absolute inset-0 opacity-10 pointer-events-none"></div>
 <div class="max-w-container-max mx-auto px-margin-mobile lg:px-margin-desktop relative">
 <div class="hidden sm:block ornament mb-4 max-w-[180px] mx-auto"><span class="text-gold-light">OUR JOURNEY</span></div>
-<h2 class="font-display text-xl sm:text-3xl md:text-4xl text-ivory mb-6 sm:mb-16 text-center font-semibold">Milestones</h2>
+<h2 class="font-display text-xl sm:text-3xl md:text-4xl text-ivory mb-6 sm:mb-16 text-center font-semibold">Our First Few Weeks</h2>
 <div class="grid grid-cols-2 md:grid-cols-4 gap-5 sm:gap-8 relative">
 <div class="hidden md:block absolute top-6 left-[12%] right-[12%] h-px bg-gold/30"></div>
 <div class="relative text-center">
 <div class="w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-gold-gradient flex items-center justify-center shadow-gold mx-auto mb-2.5 sm:mb-4 relative z-10 font-display text-maroon-dark font-bold text-sm sm:text-base">1</div>
-<div class="font-label text-gold-light text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-1">2013</div>
-<p class="text-ivory/80 text-xs sm:text-sm">Founded with a single stall of hand-pressed ghee and samidha.</p>
+<div class="font-label text-gold-light text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-1">Week 1</div>
+<p class="text-ivory/80 text-xs sm:text-sm">Founded YAGYA with a vision for sattvic, ritual-ready living.</p>
 </div>
 <div class="relative text-center">
 <div class="w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-gold-gradient flex items-center justify-center shadow-gold mx-auto mb-2.5 sm:mb-4 relative z-10 font-display text-maroon-dark font-bold text-sm sm:text-base">2</div>
-<div class="font-label text-gold-light text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-1">2017</div>
-<p class="text-ivory/80 text-xs sm:text-sm">Partnered with 50+ farms and artisans across India.</p>
+<div class="font-label text-gold-light text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-1">Week 2</div>
+<p class="text-ivory/80 text-xs sm:text-sm">Partnered with our first trusted farms and artisans.</p>
 </div>
 <div class="relative text-center">
 <div class="w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-gold-gradient flex items-center justify-center shadow-gold mx-auto mb-2.5 sm:mb-4 relative z-10 font-display text-maroon-dark font-bold text-sm sm:text-base">3</div>
-<div class="font-label text-gold-light text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-1">2021</div>
-<p class="text-ivory/80 text-xs sm:text-sm">Launched our Complete Yagya Kits for home ceremonies.</p>
+<div class="font-label text-gold-light text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-1">Week 3</div>
+<p class="text-ivory/80 text-xs sm:text-sm">Curated and prepared our debut collection of ritual essentials.</p>
 </div>
 <div class="relative text-center">
 <div class="w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-gold-gradient flex items-center justify-center shadow-gold mx-auto mb-2.5 sm:mb-4 relative z-10 font-display text-maroon-dark font-bold text-sm sm:text-base">4</div>
-<div class="font-label text-gold-light text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-1">2026</div>
-<p class="text-ivory/80 text-xs sm:text-sm">Serving 2,500+ households with YAGYA, online.</p>
+<div class="font-label text-gold-light text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-1">Today</div>
+<p class="text-ivory/80 text-xs sm:text-sm">Launched online — welcoming our very first customers.</p>
 </div>
 </div>
 </div>
@@ -649,7 +734,7 @@ Buy Now
 </div>
 <div class="bg-ivory rounded-xl sm:rounded-2xl shadow-card ring-1 ring-gold/15 p-4 sm:p-6 flex items-start gap-3 sm:gap-4 hover:shadow-card-hover transition-shadow">
 <span class="w-9 h-9 sm:w-12 sm:h-12 rounded-full bg-gold-gradient flex items-center justify-center shadow-gold shrink-0"><span class="material-symbols-outlined text-maroon-dark text-[18px] sm:text-[24px]">location_on</span></span>
-<div><h3 class="font-display text-sm sm:text-lg text-maroon font-semibold mb-0.5 sm:mb-1">Visit Us</h3><p class="text-ink-soft text-xs sm:text-sm">14 Temple Road, Bhopal</p><p class="text-ink-soft text-xs sm:text-sm">Madhya Pradesh, India</p></div>
+<div><h3 class="font-display text-sm sm:text-lg text-maroon font-semibold mb-0.5 sm:mb-1">Visit Us</h3><p class="text-ink-soft text-xs sm:text-sm">Indrapuri Colony, Gwarighat</p><p class="text-ink-soft text-xs sm:text-sm">Jabalpur, Madhya Pradesh</p></div>
 </div>
 </div>
 </section>
@@ -810,12 +895,12 @@ Promo Code
 <div class="bg-ivory rounded-xl sm:rounded-2xl shadow-card ring-1 ring-gold/20 p-4 sm:p-6 lg:p-8">
 <h2 class="font-display text-base sm:text-xl text-maroon font-semibold mb-3 sm:mb-6 flex items-center gap-2"><span class="material-symbols-outlined text-copper text-[18px] sm:text-[24px]">local_shipping</span> Shipping Details</h2>
 <form id="shippingForm" class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-5">
-<input required class="bg-cream border-b-2 border-gold/30 focus:border-maroon px-3 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base rounded-t-lg focus:outline-none transition-colors md:col-span-2" placeholder="Full Name" type="text"/>
-<input required class="bg-cream border-b-2 border-gold/30 focus:border-maroon px-3 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base rounded-t-lg focus:outline-none transition-colors md:col-span-2" placeholder="Address Line" type="text"/>
-<input required class="bg-cream border-b-2 border-gold/30 focus:border-maroon px-3 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base rounded-t-lg focus:outline-none transition-colors" placeholder="City" type="text"/>
-<input required class="bg-cream border-b-2 border-gold/30 focus:border-maroon px-3 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base rounded-t-lg focus:outline-none transition-colors" placeholder="PIN Code" type="text"/>
-<input required class="bg-cream border-b-2 border-gold/30 focus:border-maroon px-3 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base rounded-t-lg focus:outline-none transition-colors" placeholder="Phone Number" type="tel"/>
-<input required class="bg-cream border-b-2 border-gold/30 focus:border-maroon px-3 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base rounded-t-lg focus:outline-none transition-colors" placeholder="Email" type="email"/>
+<input id="sName" required class="bg-cream border-b-2 border-gold/30 focus:border-maroon px-3 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base rounded-t-lg focus:outline-none transition-colors md:col-span-2" placeholder="Full Name" type="text"/>
+<input id="sAddress" required class="bg-cream border-b-2 border-gold/30 focus:border-maroon px-3 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base rounded-t-lg focus:outline-none transition-colors md:col-span-2" placeholder="Address Line" type="text"/>
+<input id="sCity" required class="bg-cream border-b-2 border-gold/30 focus:border-maroon px-3 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base rounded-t-lg focus:outline-none transition-colors" placeholder="City" type="text"/>
+<input id="sPin" required class="bg-cream border-b-2 border-gold/30 focus:border-maroon px-3 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base rounded-t-lg focus:outline-none transition-colors" placeholder="PIN Code" type="text"/>
+<input id="sPhone" required class="bg-cream border-b-2 border-gold/30 focus:border-maroon px-3 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base rounded-t-lg focus:outline-none transition-colors" placeholder="Phone Number" type="tel"/>
+<input id="sEmail" required class="bg-cream border-b-2 border-gold/30 focus:border-maroon px-3 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base rounded-t-lg focus:outline-none transition-colors" placeholder="Email" type="email"/>
 </form>
 </div>
 
@@ -892,7 +977,29 @@ Place Order
 <h1 class="font-display text-xl sm:text-3xl md:text-4xl text-maroon font-semibold mb-2.5 sm:mb-4">Order Placed Successfully</h1>
 <p class="font-body text-sm sm:text-lg text-ink-soft max-w-md mb-1.5 sm:mb-2">Thank you for your sacred purchase. A confirmation has been sent to your email.</p>
 <p class="font-label text-xs sm:text-sm text-copper font-bold mb-6 sm:mb-10">Order ID: <span id="confOrderId"></span></p>
+<div class="flex flex-col sm:flex-row gap-3">
 <button id="confirmationHomeBtn" class="btn-shine bg-maroon-gradient text-ivory font-label text-xs sm:text-sm font-bold uppercase tracking-widest py-3 sm:py-4 px-8 sm:px-10 rounded-full shadow-premium hover:shadow-card-hover transition-all hover:-translate-y-0.5">Continue Shopping</button>
+<button id="confirmationOrdersBtn" class="font-label text-xs sm:text-sm font-bold text-maroon uppercase tracking-widest py-3 sm:py-4 px-8 sm:px-10 rounded-full border-2 border-maroon hover:bg-cream transition-all">View My Orders</button>
+</div>
+</div>
+</div>
+
+<!-- MY ORDERS PAGE -->
+<div id="page-orders" class="page">
+<div class="bg-hero-gradient border-b border-gold/20">
+<div class="max-w-container-max mx-auto px-margin-mobile lg:px-margin-desktop py-6 sm:py-10 lg:py-16">
+<div class="hidden sm:block ornament mb-4 max-w-[180px]"><span class="text-copper">TRACK & REVIEW</span></div>
+<h1 class="font-display text-2xl sm:text-4xl md:text-5xl text-maroon mb-1.5 sm:mb-4 font-semibold">My Orders</h1>
+<p class="font-body text-sm sm:text-lg text-ink-soft">Track your purchases and revisit past sacred offerings.</p>
+</div>
+</div>
+<div class="max-w-container-max mx-auto px-margin-mobile lg:px-margin-desktop py-5 sm:py-10 lg:py-14">
+<div id="ordersList" class="flex flex-col gap-3 sm:gap-5"></div>
+<div id="ordersEmpty" class="hidden text-center py-14 sm:py-20 text-ink-soft">
+<span class="material-symbols-outlined text-[40px] sm:text-[56px] mb-3 block text-gold">receipt_long</span>
+<p class="text-sm sm:text-base mb-5">You haven't placed any orders yet.</p>
+<button id="ordersShopBtn" class="btn-shine bg-maroon-gradient text-ivory font-label text-xs sm:text-sm font-bold uppercase tracking-widest py-3 px-8 rounded-full shadow-premium hover:-translate-y-0.5 transition-transform">Start Shopping</button>
+</div>
 </div>
 </div>
 
@@ -968,7 +1075,7 @@ const PRODUCTS = [
 const CATS = [...new Set(PRODUCTS.map(p=>p.cat))];
 let cart = {};
 
-function esc(s){return s.replace(/&/g,'&amp;').replace(/'/g,'&#39;').replace(/"/g,'&quot;');}
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;').replace(/"/g,'&quot;');}
 
 function showPage(name){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
@@ -980,6 +1087,7 @@ function showPage(name){
   window.scrollTo(0,0);
   if(name==='cart') renderCart();
   if(name==='payment') renderPayment();
+  if(name==='orders') renderOrders();
   const mn = document.getElementById('mobileNav');
   const ms = document.getElementById('mobileSearchBar');
   if(mn && !mn.classList.contains('hidden')){ mn.classList.add('hidden'); mn.classList.remove('flex'); }
@@ -1146,16 +1254,86 @@ function renderShop(){
   document.getElementById('shopGrid').innerHTML = list.map(productCard).join('') || '<p class="col-span-4 text-center text-ink-soft">No products found.</p>';
   wireAddButtons(document.getElementById('shopGrid'));
 }
-function filterCat(c){ activeCat=c; showPage('shop'); renderShop(); }
-
-function onSearch(q){
-  q=q.trim().toLowerCase();
+function filterCat(c){
+  activeCat=c;
   showPage('shop');
-  activeCat='All';
-  const list = PRODUCTS.filter(p=>p.name.toLowerCase().includes(q)||p.cat.toLowerCase().includes(q));
-  document.getElementById('filterBar').innerHTML='';
-  document.getElementById('shopGrid').innerHTML = list.map(productCard).join('') || '<p class="col-span-4 text-center text-ink-soft">No products found.</p>';
+  const sb = document.getElementById('searchBox'); if(sb) sb.value='';
+  const msb = document.getElementById('mobileSearchBox'); if(msb) msb.value='';
+  renderShop();
+}
+
+function productMatchesQuery(p, words){
+  const haystack = (p.name + ' ' + p.cat + ' ' + (p.desc||'') + ' ' + (p.fullDesc||'')).toLowerCase();
+  return words.every(w => haystack.includes(w));
+}
+function matchProducts(query){
+  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if(words.length === 0) return [];
+  return PRODUCTS.filter(p => productMatchesQuery(p, words));
+}
+
+function searchResultRow(p){
+  return `<div class="search-result-item flex items-center gap-3 px-3 sm:px-4 py-2.5 hover:bg-cream cursor-pointer transition-colors" data-id="${p.id}">
+    <img src="${p.img}" class="w-10 h-10 sm:w-12 sm:h-12 rounded-lg object-cover ring-1 ring-gold/25 shrink-0"/>
+    <div class="flex-1 min-w-0">
+      <div class="font-label text-xs sm:text-sm font-semibold text-ink truncate">${p.name}</div>
+      <div class="font-body text-[10px] sm:text-xs text-ink-soft">${p.cat}</div>
+    </div>
+    <div class="font-label text-xs sm:text-sm font-bold text-maroon whitespace-nowrap">₹${p.price.toLocaleString('en-IN')}</div>
+  </div>`;
+}
+
+function renderSearchDropdown(dropdownEl, query){
+  const q = query.trim();
+  if(q.length === 0){
+    dropdownEl.classList.add('hidden');
+    dropdownEl.innerHTML = '';
+    return;
+  }
+  const results = matchProducts(q).slice(0, 6);
+  const totalMatches = matchProducts(q).length;
+
+  if(results.length === 0){
+    dropdownEl.innerHTML = `<div class="px-4 py-6 text-center text-ink-soft text-xs sm:text-sm">No products found for "${esc(q)}".</div>`;
+  } else {
+    const viewAllRow = totalMatches > results.length
+      ? `<button class="search-view-all w-full text-center px-4 py-2.5 font-label text-[11px] sm:text-xs font-bold text-maroon uppercase tracking-wide hover:bg-cream border-t border-gold/15">View all ${totalMatches} results</button>`
+      : `<button class="search-view-all w-full text-center px-4 py-2.5 font-label text-[11px] sm:text-xs font-bold text-maroon uppercase tracking-wide hover:bg-cream border-t border-gold/15">View in Shop</button>`;
+    dropdownEl.innerHTML = `<div class="divide-y divide-gold/10">${results.map(searchResultRow).join('')}</div>${viewAllRow}`;
+  }
+  dropdownEl.classList.remove('hidden');
+
+  dropdownEl.querySelectorAll('.search-result-item').forEach(row=>{
+    row.addEventListener('click',()=>{
+      const id = Number(row.dataset.id);
+      dropdownEl.classList.add('hidden');
+      document.getElementById('searchBox').value = '';
+      if(document.getElementById('mobileSearchBox')) document.getElementById('mobileSearchBox').value = '';
+      closeMobileSearch();
+      openProduct(id);
+    });
+  });
+  const viewAllBtn = dropdownEl.querySelector('.search-view-all');
+  if(viewAllBtn){
+    viewAllBtn.addEventListener('click',()=>{
+      commitSearchToShop(q);
+      dropdownEl.classList.add('hidden');
+    });
+  }
+}
+
+function commitSearchToShop(q){
+  showPage('shop');
+  activeCat = 'All';
+  const list = matchProducts(q);
+  document.getElementById('filterBar').innerHTML = '';
+  document.getElementById('shopGrid').innerHTML = list.map(productCard).join('')
+    || `<p class="col-span-2 md:col-span-3 lg:col-span-4 text-center text-ink-soft py-10">No products found for "${esc(q)}".</p>`;
   wireAddButtons(document.getElementById('shopGrid'));
+}
+
+function onSearch(q, dropdownId){
+  renderSearchDropdown(document.getElementById(dropdownId), q);
 }
 
 function addToCart(id){
@@ -1239,7 +1417,7 @@ function renderCart(){
 
 function checkout(){
   if(Object.keys(cart).length===0){ showToast('Your cart is empty'); return; }
-  showPage('payment');
+  requireOtpAuth(()=> showPage('payment'));
 }
 function joinNewsletter(){
   const v=document.getElementById('newsletterEmail').value.trim();
@@ -1286,7 +1464,7 @@ document.getElementById('pdBuyNowBtn').addEventListener('click',()=>{
   cart[currentProductId] = (cart[currentProductId]||0) + pdQty;
   updateCartCount();
   renderCart();
-  showPage('payment');
+  requireOtpAuth(()=> showPage('payment'));
 });
 
 function burstAtCart(){
@@ -1354,25 +1532,182 @@ function renderPayment(){
   document.getElementById('payTotal').textContent = '₹'+total.toFixed(2);
 }
 document.getElementById('backToCartBtn').addEventListener('click',()=>showPage('cart'));
+
+/* ---- Orders: persisted in localStorage ---- */
+const ORDERS_KEY = 'yagya_orders';
+function getOrders(){
+  try{
+    const raw = localStorage.getItem(ORDERS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch(e){ return []; }
+}
+function saveOrders(orders){
+  try{ localStorage.setItem(ORDERS_KEY, JSON.stringify(orders)); } catch(e){}
+}
+function statusForOrder(order){
+  const daysSince = (Date.now() - order.createdAt) / (1000*60*60*24);
+  if(daysSince > 5) return 'Delivered';
+  if(daysSince > 1) return 'Shipped';
+  return 'Processing';
+}
+const STATUS_STEPS = ['Processing','Shipped','Delivered'];
+const STATUS_ICON = { Processing:'hourglass_top', Shipped:'local_shipping', Delivered:'check_circle' };
+
 document.getElementById('placeOrderBtn').addEventListener('click',()=>{
   if(Object.keys(cart).length===0){ showToast('Your cart is empty'); return; }
   const form = document.getElementById('shippingForm');
   if(!form.checkValidity()){ form.reportValidity(); return; }
+
+  const ids = Object.keys(cart);
+  const items = ids.map(id=>{
+    const p = PRODUCTS.find(pp=>pp.id==id);
+    return { id:p.id, name:p.name, img:p.img, cat:p.cat, price:p.price, qty:cart[id] };
+  });
+  const subtotal = items.reduce((s,it)=>s+it.price*it.qty,0);
+  const discounted = subtotal*(1-promoDiscount);
+  const tax = discounted*0.05;
+  const total = discounted+tax;
+  const payMethodEl = document.querySelector('input[name="paymethod"]:checked');
   const orderId = 'YG' + Math.floor(100000 + Math.random()*900000);
+
+  const order = {
+    id: orderId,
+    createdAt: Date.now(),
+    items: items,
+    subtotal: subtotal,
+    tax: tax,
+    total: total,
+    paymentMethod: payMethodEl ? payMethodEl.value : 'card',
+    shipping: {
+      name: document.getElementById('sName').value.trim(),
+      address: document.getElementById('sAddress').value.trim(),
+      city: document.getElementById('sCity').value.trim(),
+      pin: document.getElementById('sPin').value.trim(),
+      phone: document.getElementById('sPhone').value.trim(),
+      email: document.getElementById('sEmail').value.trim()
+    }
+  };
+  const orders = getOrders();
+  orders.unshift(order);
+  saveOrders(orders);
+
   document.getElementById('confOrderId').textContent = orderId;
   cart = {}; promoDiscount = 0;
   updateCartCount();
   showPage('confirmation');
 });
 document.getElementById('confirmationHomeBtn').addEventListener('click',()=>showPage('home'));
+document.getElementById('confirmationOrdersBtn').addEventListener('click',()=>showPage('orders'));
+document.getElementById('ordersBtn').addEventListener('click',()=>showPage('orders'));
+document.getElementById('ordersShopBtn').addEventListener('click',()=>showPage('shop'));
 
+function renderOrders(){
+  const orders = getOrders();
+  const list = document.getElementById('ordersList');
+  const empty = document.getElementById('ordersEmpty');
+  if(orders.length === 0){
+    list.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+  list.innerHTML = orders.map(order=>{
+    const status = statusForOrder(order);
+    const stepIdx = STATUS_STEPS.indexOf(status);
+    const dateStr = new Date(order.createdAt).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' });
+    const previewItems = order.items.slice(0,3);
+    const moreCount = order.items.length - previewItems.length;
+
+    const statusPill = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-label font-bold uppercase tracking-wide ${status==='Delivered' ? 'bg-cream text-copper' : status==='Shipped' ? 'bg-gold/20 text-gold-dark' : 'bg-maroon/10 text-maroon'}">
+      <span class="material-symbols-outlined text-[13px] sm:text-[15px]">${STATUS_ICON[status]}</span>${status}
+    </span>`;
+
+    const stepper = STATUS_STEPS.map((s,i)=>`
+      <div class="flex-1 flex flex-col items-center gap-1">
+        <div class="w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center text-[13px] sm:text-[15px] ${i<=stepIdx ? 'bg-gold-gradient text-maroon-dark shadow-gold' : 'bg-cream text-ink-soft/50 ring-1 ring-gold/20'}">
+          <span class="material-symbols-outlined text-[13px] sm:text-[15px]">${STATUS_ICON[s]}</span>
+        </div>
+        <span class="text-[9px] sm:text-[10px] font-label font-semibold uppercase ${i<=stepIdx ? 'text-maroon' : 'text-ink-soft/50'}">${s}</span>
+      </div>`).join(`<div class="flex-1 h-[2px] mt-3 sm:mt-3.5 -mx-1"></div>`);
+
+    const itemsPreview = previewItems.map(it=>`
+      <img src="${it.img}" class="w-10 h-10 sm:w-12 sm:h-12 rounded-lg object-cover ring-1 ring-gold/25 -ml-2 first:ml-0" title="${it.name}"/>
+    `).join('');
+
+    const itemsDetail = order.items.map(it=>`
+      <div class="flex items-center gap-3 py-2">
+        <img src="${it.img}" class="w-10 h-10 sm:w-12 sm:h-12 rounded-lg object-cover ring-1 ring-gold/25 shrink-0"/>
+        <div class="flex-1 min-w-0">
+          <div class="font-label text-xs sm:text-sm font-semibold text-ink truncate">${it.name}</div>
+          <div class="font-body text-[11px] sm:text-xs text-ink-soft">Qty ${it.qty} · ₹${it.price.toLocaleString('en-IN')} each</div>
+        </div>
+        <div class="font-label text-xs sm:text-sm font-bold text-maroon whitespace-nowrap">₹${(it.price*it.qty).toLocaleString('en-IN')}</div>
+      </div>`).join('');
+
+    return `<div class="bg-ivory rounded-xl sm:rounded-2xl shadow-card ring-1 ring-gold/15 overflow-hidden order-card" data-order="${order.id}">
+      <button class="order-toggle w-full text-left p-3.5 sm:p-6 flex items-center gap-3 sm:gap-5">
+        <div class="flex -space-x-2 shrink-0">${itemsPreview}${moreCount>0 ? `<div class="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-cream ring-1 ring-gold/25 flex items-center justify-center text-[10px] sm:text-xs font-label font-bold text-copper -ml-2">+${moreCount}</div>` : ''}</div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap mb-1">
+            <span class="font-label text-xs sm:text-sm font-bold text-ink">${order.id}</span>
+            ${statusPill}
+          </div>
+          <div class="font-body text-[11px] sm:text-xs text-ink-soft">${dateStr} · ${order.items.length} item${order.items.length!==1?'s':''} · <span class="font-semibold text-maroon">₹${order.total.toFixed(2)}</span></div>
+        </div>
+        <span class="material-symbols-outlined text-ink-soft order-chevron transition-transform text-[20px] sm:text-[24px] shrink-0">expand_more</span>
+      </button>
+      <div class="order-details hidden border-t border-gold/15 p-3.5 sm:p-6 pt-3 sm:pt-5">
+        <div class="flex items-center mb-5 sm:mb-6 px-1 sm:px-4">${stepper}</div>
+        <div class="divide-y divide-gold/10 mb-4">${itemsDetail}</div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 pt-3 border-t border-gold/15">
+          <div>
+            <div class="font-label text-[10px] font-bold text-copper uppercase tracking-wide mb-1">Shipping Address</div>
+            <div class="font-body text-xs sm:text-sm text-ink-soft">${order.shipping.name}<br/>${order.shipping.address}, ${order.shipping.city} - ${order.shipping.pin}</div>
+          </div>
+          <div>
+            <div class="font-label text-[10px] font-bold text-copper uppercase tracking-wide mb-1">Payment Method</div>
+            <div class="font-body text-xs sm:text-sm text-ink-soft capitalize">${order.paymentMethod === 'cod' ? 'Cash on Delivery' : order.paymentMethod === 'upi' ? 'UPI' : 'Credit / Debit Card'}</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.querySelectorAll('.order-toggle').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const card = btn.closest('.order-card');
+      const details = card.querySelector('.order-details');
+      const chevron = card.querySelector('.order-chevron');
+      const isOpen = !details.classList.contains('hidden');
+      details.classList.toggle('hidden', isOpen);
+      chevron.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+    });
+  });
+}
 
 document.getElementById('logoHome').addEventListener('click',()=>showPage('home'));
 document.querySelectorAll('.nav-link').forEach(a=>{
-  a.addEventListener('click',e=>{ e.preventDefault(); showPage(a.dataset.page); });
+  a.addEventListener('click',e=>{
+    e.preventDefault();
+    const page = a.dataset.page;
+    showPage(page);
+    if(page==='shop'){ activeCat='All'; document.getElementById('searchBox').value=''; renderShop(); }
+  });
 });
 document.getElementById('cartBtn').addEventListener('click',()=>showPage('cart'));
-document.getElementById('searchBox').addEventListener('input',e=>onSearch(e.target.value));
+document.getElementById('searchBox').addEventListener('input',e=>onSearch(e.target.value,'searchDropdown'));
+document.getElementById('searchBox').addEventListener('focus',e=>{ if(e.target.value.trim()) onSearch(e.target.value,'searchDropdown'); });
+document.getElementById('searchBox').addEventListener('keydown',e=>{
+  if(e.key==='Enter' && e.target.value.trim()){ commitSearchToShop(e.target.value); document.getElementById('searchDropdown').classList.add('hidden'); }
+  if(e.key==='Escape'){ document.getElementById('searchDropdown').classList.add('hidden'); e.target.blur(); }
+});
+document.addEventListener('click',(e)=>{
+  const dd = document.getElementById('searchDropdown');
+  const sb = document.getElementById('searchBox');
+  if(dd && !dd.classList.contains('hidden') && !dd.contains(e.target) && e.target!==sb){
+    dd.classList.add('hidden');
+  }
+});
 
 /* ---- Mobile menu & search ---- */
 const mobileMenuBtn = document.getElementById('mobileMenuBtn');
@@ -1388,6 +1723,8 @@ function closeMobileNav(){
 }
 function closeMobileSearch(){
   mobileSearchBar.classList.add('hidden');
+  const dd = document.getElementById('mobileSearchDropdown');
+  if(dd) dd.classList.add('hidden');
 }
 mobileMenuBtn.addEventListener('click',()=>{
   closeMobileSearch();
@@ -1408,14 +1745,22 @@ document.querySelectorAll('.mobile-nav-link').forEach(a=>{
   a.addEventListener('click',e=>{
     e.preventDefault();
     closeMobileNav();
-    showPage(a.dataset.page);
+    const page = a.dataset.page;
+    showPage(page);
+    if(page==='shop'){ activeCat='All'; mobileSearchBox.value=''; document.getElementById('searchBox').value=''; renderShop(); }
   });
 });
 mobileSearchBox.addEventListener('input',e=>{
-  onSearch(e.target.value);
+  onSearch(e.target.value,'mobileSearchDropdown');
 });
+mobileSearchBox.addEventListener('focus',e=>{ if(e.target.value.trim()) onSearch(e.target.value,'mobileSearchDropdown'); });
 mobileSearchBox.addEventListener('keydown',e=>{
-  if(e.key==='Enter'){ closeMobileSearch(); }
+  if(e.key==='Enter' && e.target.value.trim()){
+    commitSearchToShop(e.target.value);
+    document.getElementById('mobileSearchDropdown').classList.add('hidden');
+    closeMobileSearch();
+  }
+  if(e.key==='Escape'){ document.getElementById('mobileSearchDropdown').classList.add('hidden'); }
 });
 
 document.getElementById('ourStoryLink').addEventListener('click',e=>{ e.preventDefault(); showPage('about'); });
@@ -1512,6 +1857,104 @@ document.getElementById('homeNewsletterBtn').addEventListener('click',()=>{
   });
   startAuto();
 })();
+
+/* ---- Simulated Phone OTP Auth (demo only, not real SMS) ---- */
+let isPhoneVerified = false;
+let verifiedPhone = null;
+let otpPendingAction = null;
+let otpDemoCode = null;
+
+const otpModalOverlay = document.getElementById('otpModalOverlay');
+const otpStepPhone = document.getElementById('otpStepPhone');
+const otpStepCode = document.getElementById('otpStepCode');
+const otpPhoneInput = document.getElementById('otpPhoneInput');
+const otpPhoneError = document.getElementById('otpPhoneError');
+const otpCodeInput = document.getElementById('otpCodeInput');
+const otpCodeError = document.getElementById('otpCodeError');
+const otpPhoneDisplay = document.getElementById('otpPhoneDisplay');
+const otpDemoCodeEl = document.getElementById('otpDemoCode');
+
+function requireOtpAuth(onVerified){
+  if(isPhoneVerified){ onVerified(); return; }
+  otpPendingAction = onVerified;
+  openOtpModal();
+}
+function openOtpModal(){
+  otpModalOverlay.classList.remove('hidden');
+  otpStepPhone.classList.remove('hidden');
+  otpStepCode.classList.add('hidden');
+  otpPhoneError.classList.add('hidden');
+  otpCodeError.classList.add('hidden');
+  otpPhoneInput.value = '';
+  otpCodeInput.value = '';
+  setTimeout(()=>otpPhoneInput.focus(), 100);
+}
+function closeOtpModal(){
+  otpModalOverlay.classList.add('hidden');
+  otpPendingAction = null;
+}
+function generateDemoOtp(){
+  otpDemoCode = String(Math.floor(100000 + Math.random()*900000));
+  otpDemoCodeEl.textContent = otpDemoCode;
+}
+document.getElementById('otpModalClose').addEventListener('click', closeOtpModal);
+otpModalOverlay.addEventListener('click', (e)=>{ if(e.target === otpModalOverlay) closeOtpModal(); });
+
+document.getElementById('otpSendBtn').addEventListener('click', ()=>{
+  const phone = otpPhoneInput.value.trim();
+  if(!/^[6-9]\d{9}$/.test(phone)){
+    otpPhoneError.classList.remove('hidden');
+    otpPhoneInput.parentElement.classList.add('shake');
+    setTimeout(()=>otpPhoneInput.parentElement.classList.remove('shake'), 400);
+    return;
+  }
+  otpPhoneError.classList.add('hidden');
+  verifiedPhone = phone;
+  otpPhoneDisplay.textContent = '+91 ' + phone;
+  generateDemoOtp();
+  otpStepPhone.classList.add('hidden');
+  otpStepCode.classList.remove('hidden');
+  otpCodeInput.value = '';
+  otpCodeError.classList.add('hidden');
+  setTimeout(()=>otpCodeInput.focus(), 100);
+  showToast('OTP sent to +91 ' + phone);
+});
+
+document.getElementById('otpVerifyBtn').addEventListener('click', ()=>{
+  const entered = otpCodeInput.value.trim();
+  if(entered === otpDemoCode){
+    otpCodeError.classList.add('hidden');
+    isPhoneVerified = true;
+    closeOtpModal();
+    showToast('Number verified successfully');
+    if(otpPendingAction){ const action = otpPendingAction; otpPendingAction = null; action(); }
+  } else {
+    otpCodeError.classList.remove('hidden');
+    otpCodeInput.classList.add('shake');
+    setTimeout(()=>otpCodeInput.classList.remove('shake'), 400);
+  }
+});
+
+document.getElementById('otpResendBtn').addEventListener('click', ()=>{
+  generateDemoOtp();
+  otpCodeInput.value = '';
+  otpCodeError.classList.add('hidden');
+  showToast('New OTP sent to +91 ' + verifiedPhone);
+});
+
+document.getElementById('otpChangeNumber').addEventListener('click', ()=>{
+  otpStepCode.classList.add('hidden');
+  otpStepPhone.classList.remove('hidden');
+  otpPhoneInput.value = verifiedPhone || '';
+  setTimeout(()=>otpPhoneInput.focus(), 100);
+});
+
+otpCodeInput.addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter') document.getElementById('otpVerifyBtn').click();
+});
+otpPhoneInput.addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter') document.getElementById('otpSendBtn').click();
+});
 
 showPage('home');
 renderHome();
