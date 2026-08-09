@@ -1303,7 +1303,15 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 let supabaseClient = null;
 if (SUPABASE_URL !== 'YOUR_SUPABASE_URL' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY' && window.supabase) {
-  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  // Isolated auth storage so the public storefront NEVER shares a login session
+  // with the admin panel (admin.html), even though both live on the same site.
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+      storageKey: 'yagya-storefront-auth', // distinct from admin.html's default key
+      persistSession: false,                // storefront never needs to persist a login
+      autoRefreshToken: false
+    }
+  });
 }
 
 let PRODUCTS = [
