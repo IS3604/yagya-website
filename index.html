@@ -1892,24 +1892,12 @@ function renderPayment(){
 }
 document.getElementById('backToCartBtn').addEventListener('click',()=>showPage('cart'));
 
-/* ---- Orders: persisted in localStorage ---- */
-const ORDERS_KEY = 'yagya_orders';
-function getOrders(){
-  try{
-    const raw = localStorage.getItem(ORDERS_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch(e){ return []; }
-}
-function saveOrders(orders){
-  try{ localStorage.setItem(ORDERS_KEY, JSON.stringify(orders)); } catch(e){}
-}
-
-/* ---- Sync order to Supabase (best-effort, doesn't block checkout) ---- */
+/* ---- Sync order to Supabase (this is now the only place orders live) ---- */
 async function syncOrderToSupabase(order){
-  if(!supabaseClient) return;
+  if(!supabaseClient) return false;
   try{
     const phone = (typeof verifiedPhone !== 'undefined' && verifiedPhone) ? verifiedPhone : (order.shipping && order.shipping.phone) || '';
-    await supabaseClient.from('orders').insert({
+    const { error } = await supabaseClient.from('orders').insert({
       id: order.id,
       phone: phone,
       shipping: order.shipping,
@@ -1920,8 +1908,11 @@ async function syncOrderToSupabase(order){
       payment_method: order.paymentMethod,
       status: 'Processing'
     });
+    if(error){ console.error('Could not save order to Supabase.', error); return false; }
+    return true;
   } catch(e){
-    console.error('Could not sync order to Supabase (order still saved locally).', e);
+    console.error('Could not save order to Supabase.', e);
+    return false;
   }
 }
 
@@ -2015,10 +2006,17 @@ const RETURN_STATUS_COLOR = {
 };
 let expandedOrderId = null;
 
-document.getElementById('placeOrderBtn').addEventListener('click',()=>{
+document.getElementById('placeOrderBtn').addEventListener('click', async ()=>{
   if(Object.keys(cart).length===0){ showToast('Your cart is empty'); return; }
   const form = document.getElementById('shippingForm');
   if(!form.checkValidity()){ form.reportValidity(); return; }
+  if(!supabaseClient){ showToast('Ordering is temporarily unavailable — please try again shortly.'); return; }
+
+  const placeBtn = document.getElementById('placeOrderBtn');
+  placeBtn.disabled = true;
+  placeBtn.classList.add('opacity-60','pointer-events-none');
+  const originalBtnHtml = placeBtn.innerHTML;
+  placeBtn.innerHTML = '<span class="material-symbols-outlined text-[20px] animate-spin">progress_activity</span> Placing Order...';
 
   const ids = Object.keys(cart);
   const items = ids.map(id=>{
@@ -2049,10 +2047,16 @@ document.getElementById('placeOrderBtn').addEventListener('click',()=>{
       email: document.getElementById('sEmail').value.trim()
     }
   };
-  const orders = getOrders();
-  orders.unshift(order);
-  saveOrders(orders);
-  syncOrderToSupabase(order);
+
+  const saved = await syncOrderToSupabase(order);
+  if(!saved){
+    showToast('Could not place your order — please check your connection and try again.');
+    placeBtn.disabled = false;
+    placeBtn.classList.remove('opacity-60','pointer-events-none');
+    placeBtn.innerHTML = originalBtnHtml;
+    return;
+  }
+
   deductStockForOrder(order);
   const phoneForRecord = (typeof verifiedPhone !== 'undefined' && verifiedPhone) ? verifiedPhone : order.shipping.phone;
   saveCustomerRecord(phoneForRecord, order.shipping);
@@ -2060,6 +2064,9 @@ document.getElementById('placeOrderBtn').addEventListener('click',()=>{
   document.getElementById('confOrderId').textContent = orderId;
   cart = {}; promoDiscount = 0;
   updateCartCount();
+  placeBtn.disabled = false;
+  placeBtn.classList.remove('opacity-60','pointer-events-none');
+  placeBtn.innerHTML = originalBtnHtml;
   showPage('confirmation');
 });
 document.getElementById('confirmationHomeBtn').addEventListener('click',()=>showPage('home'));
@@ -2110,51 +2117,79 @@ function effectiveStatus(order){
   return order.dbStatus || statusForOrder(order);
 }
 
+let lastRenderedOrders = []; // whatever is currently shown in My Orders (Supabase or local) — used by the return modal
+
 async function renderOrders(){
   const list = document.getElementById('ordersList');
   const empty = document.getElementById('ordersEmpty');
 
-  let orders = getOrders(); // instant fallback so the page never looks empty while loading
+  if(!supabaseClient){
+    list.innerHTML = '';
+    empty.innerHTML = `<span class="material-symbols-outlined text-[40px] sm:text-[56px] mb-3 block text-gold">receipt_long</span><p class="text-sm sm:text-base mb-1">Orders are temporarily unavailable.</p><p class="text-xs text-ink-soft/70">Please try again shortly.</p>`;
+    empty.classList.remove('hidden');
+    lastRenderedOrders = [];
+    return;
+  }
 
-  if(supabaseClient && typeof verifiedPhone !== 'undefined' && verifiedPhone){
-    list.innerHTML = '<p class="text-center text-ink-soft text-sm py-10">Loading your orders…</p>';
-    empty.classList.add('hidden');
-    try{
-      const [{ data, error }, { data: returnData }] = await Promise.all([
-        supabaseClient.from('orders').select('*').eq('phone', verifiedPhone).order('created_at', { ascending: false }),
-        supabaseClient.from('return_requests').select('*').eq('phone', verifiedPhone)
-      ]);
-      if(!error && data){
-        orders = data.map(row => {
-          const returnsMap = {};
-          (returnData || []).filter(r => r.order_id === row.id).forEach(r => {
-            returnsMap[r.item_id] = { status: r.status, reason: r.reason, requestedAt: new Date(r.requested_at).getTime() };
-          });
-          return {
-            id: row.id,
-            createdAt: new Date(row.created_at).getTime(),
-            items: row.items,
-            subtotal: Number(row.subtotal),
-            tax: Number(row.tax),
-            total: Number(row.total),
-            paymentMethod: row.payment_method,
-            shipping: row.shipping,
-            returns: returnsMap,
-            dbStatus: row.status
-          };
+  if(typeof verifiedPhone === 'undefined' || !verifiedPhone){
+    list.innerHTML = '';
+    empty.innerHTML = `<span class="material-symbols-outlined text-[40px] sm:text-[56px] mb-3 block text-gold">smartphone</span><p class="text-sm sm:text-base mb-5">Verify your phone number to view your orders.</p><button id="ordersVerifyBtn" class="btn-shine bg-maroon-gradient text-ivory font-label text-xs sm:text-sm font-bold uppercase tracking-widest py-3 px-8 rounded-full shadow-premium hover:-translate-y-0.5 transition-transform">Verify Phone Number</button>`;
+    empty.classList.remove('hidden');
+    lastRenderedOrders = [];
+    const verifyBtn = document.getElementById('ordersVerifyBtn');
+    if(verifyBtn) verifyBtn.addEventListener('click', ()=> requireOtpAuth(()=> renderOrders()));
+    return;
+  }
+
+  list.innerHTML = '<p class="text-center text-ink-soft text-sm py-10">Loading your orders…</p>';
+  empty.classList.add('hidden');
+
+  let orders = [];
+  try{
+    const [{ data, error }, { data: returnData }] = await Promise.all([
+      supabaseClient.from('orders').select('*').eq('phone', verifiedPhone).order('created_at', { ascending: false }),
+      supabaseClient.from('return_requests').select('*').eq('phone', verifiedPhone)
+    ]);
+    if(!error && data){
+      orders = data.map(row => {
+        const returnsMap = {};
+        (returnData || []).filter(r => r.order_id === row.id).forEach(r => {
+          returnsMap[r.item_id] = { status: r.status, reason: r.reason, requestedAt: new Date(r.requested_at).getTime() };
         });
-      }
-    } catch(e){
-      console.error('Could not load orders from Supabase, showing locally saved orders instead.', e);
+        return {
+          id: row.id,
+          createdAt: new Date(row.created_at).getTime(),
+          items: row.items,
+          subtotal: Number(row.subtotal),
+          tax: Number(row.tax),
+          total: Number(row.total),
+          paymentMethod: row.payment_method,
+          shipping: row.shipping,
+          returns: returnsMap,
+          dbStatus: row.status
+        };
+      });
     }
+  } catch(e){
+    console.error('Could not load orders from Supabase.', e);
+    list.innerHTML = '';
+    empty.innerHTML = `<span class="material-symbols-outlined text-[40px] sm:text-[56px] mb-3 block text-gold">error</span><p class="text-sm sm:text-base">Could not load your orders. Please try again.</p>`;
+    empty.classList.remove('hidden');
+    lastRenderedOrders = [];
+    return;
   }
 
   if(orders.length === 0){
     list.innerHTML = '';
+    empty.innerHTML = `<span class="material-symbols-outlined text-[40px] sm:text-[56px] mb-3 block text-gold">receipt_long</span><p class="text-sm sm:text-base mb-5">You haven't placed any orders yet.</p><button id="ordersShopBtnEmpty" class="btn-shine bg-maroon-gradient text-ivory font-label text-xs sm:text-sm font-bold uppercase tracking-widest py-3 px-8 rounded-full shadow-premium hover:-translate-y-0.5 transition-transform">Start Shopping</button>`;
     empty.classList.remove('hidden');
+    lastRenderedOrders = [];
+    const shopBtn = document.getElementById('ordersShopBtnEmpty');
+    if(shopBtn) shopBtn.addEventListener('click', ()=> showPage('shop'));
     return;
   }
   empty.classList.add('hidden');
+  lastRenderedOrders = orders;
   list.innerHTML = orders.map(order=>{
     const status = effectiveStatus(order);
     const stepIdx = STATUS_STEPS.indexOf(status);
@@ -2276,10 +2311,12 @@ let pendingReturnItemId = null;
 function openReturnRequestModal(orderId, itemId){
   pendingReturnOrderId = orderId;
   pendingReturnItemId = itemId;
-  const orders = getOrders();
-  const order = orders.find(o=>o.id===orderId);
+  const order = lastRenderedOrders.find(o=>o.id===orderId);
   const item = order ? order.items.find(it=>it.id===itemId) : null;
-  if(!item) return;
+  if(!item){
+    showToast('Could not find that item — please refresh and try again.');
+    return;
+  }
   document.getElementById('returnModalItemName').textContent = item.name;
   document.getElementById('returnModalItemImg').src = item.img;
   document.getElementById('returnReasonSelect').value = 'Damaged / Defective';
@@ -2300,31 +2337,34 @@ document.getElementById('returnModalPolicyLink').addEventListener('click',()=>{
 });
 document.getElementById('returnModalConfirmBtn').addEventListener('click',async ()=>{
   if(!pendingReturnOrderId || pendingReturnItemId==null) return;
-  const orders = getOrders();
-  const order = orders.find(o=>o.id===pendingReturnOrderId);
+  const order = lastRenderedOrders.find(o=>o.id===pendingReturnOrderId);
   const reason = document.getElementById('returnReasonSelect').value;
   const itemName = document.getElementById('returnModalItemName').textContent;
 
-  if(order){
-    if(!order.returns) order.returns = {};
-    order.returns[pendingReturnItemId] = { status:'Requested', reason: reason, requestedAt: Date.now() };
-    saveOrders(orders);
+  if(!supabaseClient){
+    showToast('Could not submit your return — please try again shortly.');
+    return;
   }
 
-  if(supabaseClient){
-    try{
-      const phone = (typeof verifiedPhone !== 'undefined' && verifiedPhone) ? verifiedPhone : (order && order.shipping && order.shipping.phone) || '';
-      await supabaseClient.from('return_requests').insert({
-        order_id: pendingReturnOrderId,
-        item_id: pendingReturnItemId,
-        item_name: itemName,
-        reason: reason,
-        status: 'Requested',
-        phone: phone
-      });
-    } catch(e){
-      console.error('Could not sync return request to Supabase (saved locally).', e);
+  try{
+    const phone = (typeof verifiedPhone !== 'undefined' && verifiedPhone) ? verifiedPhone : (order && order.shipping && order.shipping.phone) || '';
+    const { error } = await supabaseClient.from('return_requests').insert({
+      order_id: pendingReturnOrderId,
+      item_id: pendingReturnItemId,
+      item_name: itemName,
+      reason: reason,
+      status: 'Requested',
+      phone: phone
+    });
+    if(error){
+      showToast('Could not submit your return — please try again.');
+      console.error('Could not save return request to Supabase.', error);
+      return;
     }
+  } catch(e){
+    showToast('Could not submit your return — please try again.');
+    console.error('Could not save return request to Supabase.', e);
+    return;
   }
 
   expandedOrderId = pendingReturnOrderId;
