@@ -2004,12 +2004,9 @@ function getReturnDeadline(order){
   return order.createdAt + (5 + RETURN_WINDOW_DAYS) * 24*60*60*1000;
 }
 function returnStatusFor(rec){
-  const daysSince = (Date.now() - rec.requestedAt) / (1000*60*60*24);
-  if(daysSince > 3) return 'Refunded';
-  if(daysSince > 1) return 'Pickup Scheduled';
-  return 'Requested';
+  return rec.status || 'Requested'; // real status from DB, updated by admin
 }
-const RETURN_STATUS_ICON = { 'Requested':'schedule', 'Pickup Scheduled':'local_shipping', 'Refunded':'task_alt' };
+const RETURN_STATUS_ICON = { 'Requested':'schedule', 'Pickup Scheduled':'local_shipping', 'Refunded':'task_alt', 'Rejected':'cancel' };
 let expandedOrderId = null;
 
 document.getElementById('placeOrderBtn').addEventListener('click',()=>{
@@ -2117,24 +2114,29 @@ async function renderOrders(){
     list.innerHTML = '<p class="text-center text-ink-soft text-sm py-10">Loading your orders…</p>';
     empty.classList.add('hidden');
     try{
-      const { data, error } = await supabaseClient
-        .from('orders')
-        .select('*')
-        .eq('phone', verifiedPhone)
-        .order('created_at', { ascending: false });
+      const [{ data, error }, { data: returnData }] = await Promise.all([
+        supabaseClient.from('orders').select('*').eq('phone', verifiedPhone).order('created_at', { ascending: false }),
+        supabaseClient.from('return_requests').select('*').eq('phone', verifiedPhone)
+      ]);
       if(!error && data){
-        orders = data.map(row => ({
-          id: row.id,
-          createdAt: new Date(row.created_at).getTime(),
-          items: row.items,
-          subtotal: Number(row.subtotal),
-          tax: Number(row.tax),
-          total: Number(row.total),
-          paymentMethod: row.payment_method,
-          shipping: row.shipping,
-          returns: row.returns || {},
-          dbStatus: row.status
-        }));
+        orders = data.map(row => {
+          const returnsMap = {};
+          (returnData || []).filter(r => r.order_id === row.id).forEach(r => {
+            returnsMap[r.item_id] = { status: r.status, reason: r.reason, requestedAt: new Date(r.requested_at).getTime() };
+          });
+          return {
+            id: row.id,
+            createdAt: new Date(row.created_at).getTime(),
+            items: row.items,
+            subtotal: Number(row.subtotal),
+            tax: Number(row.tax),
+            total: Number(row.total),
+            paymentMethod: row.payment_method,
+            shipping: row.shipping,
+            returns: returnsMap,
+            dbStatus: row.status
+          };
+        });
       }
     } catch(e){
       console.error('Could not load orders from Supabase, showing locally saved orders instead.', e);
@@ -2286,15 +2288,35 @@ document.getElementById('returnModalPolicyLink').addEventListener('click',()=>{
   closeReturnRequestModal();
   showPage('returns');
 });
-document.getElementById('returnModalConfirmBtn').addEventListener('click',()=>{
+document.getElementById('returnModalConfirmBtn').addEventListener('click',async ()=>{
   if(!pendingReturnOrderId || pendingReturnItemId==null) return;
   const orders = getOrders();
   const order = orders.find(o=>o.id===pendingReturnOrderId);
-  if(!order) return;
-  if(!order.returns) order.returns = {};
   const reason = document.getElementById('returnReasonSelect').value;
-  order.returns[pendingReturnItemId] = { status:'Requested', reason: reason, requestedAt: Date.now() };
-  saveOrders(orders);
+  const itemName = document.getElementById('returnModalItemName').textContent;
+
+  if(order){
+    if(!order.returns) order.returns = {};
+    order.returns[pendingReturnItemId] = { status:'Requested', reason: reason, requestedAt: Date.now() };
+    saveOrders(orders);
+  }
+
+  if(supabaseClient){
+    try{
+      const phone = (typeof verifiedPhone !== 'undefined' && verifiedPhone) ? verifiedPhone : (order && order.shipping && order.shipping.phone) || '';
+      await supabaseClient.from('return_requests').insert({
+        order_id: pendingReturnOrderId,
+        item_id: pendingReturnItemId,
+        item_name: itemName,
+        reason: reason,
+        status: 'Requested',
+        phone: phone
+      });
+    } catch(e){
+      console.error('Could not sync return request to Supabase (saved locally).', e);
+    }
+  }
+
   expandedOrderId = pendingReturnOrderId;
   closeReturnRequestModal();
   showToast('Return requested successfully');
