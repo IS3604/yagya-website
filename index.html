@@ -18,6 +18,7 @@
 <meta name="twitter:description" content="Authentic sattvic ritual essentials, hand-sourced and purely delivered."/>
 <meta name="twitter:image" content="https://is3604.github.io/yagya-website/og-image.png"/>
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 tailwind.config={darkMode:"class",theme:{extend:{
 colors:{
@@ -585,6 +586,12 @@ backgroundImage:{
 <div class="hidden sm:block ornament mb-4 max-w-[220px] mx-auto"><span class="text-copper">CURATED</span></div>
 <h2 class="font-display text-xl sm:text-3xl md:text-4xl text-maroon mb-5 sm:mb-14 text-center font-semibold">Featured Offerings</h2>
 <div id="homeFeatured" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6 lg:gap-8"></div>
+<div class="flex justify-center mt-8 sm:mt-12 lg:mt-16">
+<button id="viewAllProductsBtn" class="group inline-flex items-center gap-2 font-label text-xs sm:text-sm font-bold text-maroon uppercase tracking-widest border-2 border-maroon rounded-full py-3 px-8 sm:py-3.5 sm:px-10 hover:bg-maroon hover:text-ivory transition-colors">
+View All Products
+<span class="material-symbols-outlined text-[18px] transform transition-transform group-hover:translate-x-1">arrow_forward</span>
+</button>
+</div>
 </div>
 </section>
 
@@ -673,7 +680,7 @@ Back to Shop
 <div class="relative">
 <div class="hidden sm:block absolute w-full h-full rounded-2xl bg-gold-gradient opacity-15 blur-2xl -z-10"></div>
 <div class="rounded-xl sm:rounded-2xl overflow-hidden ring-1 ring-gold/25 shadow-premium">
-<img id="pdImage" class="w-full h-[220px] sm:h-[340px] md:h-[420px] object-cover" src="" alt=""/>
+<img id="pdImage" class="w-full h-[220px] sm:h-[340px] md:h-[420px] lg:h-[560px] object-cover" src="" alt=""/>
 </div>
 </div>
 <div>
@@ -681,6 +688,7 @@ Back to Shop
 <h1 id="pdName" class="font-display text-lg sm:text-3xl md:text-4xl text-maroon font-semibold mt-1 sm:mt-2 mb-1.5 sm:mb-3 leading-snug"></h1>
 <p id="pdShort" class="font-body text-sm sm:text-base text-ink-soft mb-3 sm:mb-6"></p>
 <div id="pdPrice" class="font-display text-xl sm:text-3xl text-maroon font-semibold mb-3 sm:mb-6"></div>
+<div id="pdStockBadge" class="hidden mb-3 sm:mb-6"></div>
 <div class="ornament mb-3 sm:mb-6 max-w-[140px] sm:max-w-[160px]"><span class="text-copper text-[10px] sm:text-xs">DESCRIPTION</span></div>
 <p id="pdDesc" class="font-body text-sm sm:text-base text-ink-soft leading-relaxed mb-4 sm:mb-8"></p>
 
@@ -1286,7 +1294,19 @@ Place Order
 </footer>
 
 <script>
-const PRODUCTS = [
+/* ============================================================
+   SUPABASE CONFIG — replace these two values with your own
+   (Project Settings -> API in your Supabase dashboard)
+   ============================================================ */
+const SUPABASE_URL = 'https://vbzjkhpampoezqzljvno.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZiempraHBhbXBvZXpxemxqdm5vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYyNzEzODMsImV4cCI6MjEwMTg0NzM4M30.Nyi22UX6FnpORb6BxQZE4xvh54_OKFJnMuIkQe02Cco';
+
+let supabaseClient = null;
+if (SUPABASE_URL !== 'YOUR_SUPABASE_URL' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE_ANON_KEY' && window.supabase) {
+  supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
+
+let PRODUCTS = [
  {id:1,name:"Pure Gir Cow Ghee",cat:"Sattvic",desc:"500ml Glass Jar",price:1250,img:"https://images.unsplash.com/photo-1573812461383-e5f8b759d12e?w=600&auto=format&fit=crop&q=80",
    fullDesc:"Slow-churned from the milk of indigenous Gir cows using the traditional bilona method. Rich in aroma and golden in colour, this ghee is prepared in small batches without preservatives — ideal for daily cooking, abhishekam, and lighting the diya during your rituals."},
  {id:2,name:"Sacred Samidha Wood Bundle",cat:"Samidha & Wood",desc:"2kg Bundle",price:800,img:"https://images.unsplash.com/photo-1571192184510-780878be86ac?w=600&auto=format&fit=crop&q=80",
@@ -1304,7 +1324,7 @@ const PRODUCTS = [
  {id:8,name:"Mango Wood Samidha",cat:"Samidha & Wood",desc:"1kg Bundle",price:400,img:"https://images.unsplash.com/photo-1761655622268-3707c5467749?w=600&auto=format&fit=crop&q=80",
    fullDesc:"Considered especially auspicious in Vedic ritual, mango wood samidha is sun-dried and cut into uniform pieces for a clean, consistent burn during havan and yagya."},
 ];
-const CATS = [...new Set(PRODUCTS.map(p=>p.cat))];
+let CATS = [...new Set(PRODUCTS.map(p=>p.cat))];
 let cart = {};
 
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;').replace(/"/g,'&quot;');}
@@ -1346,6 +1366,11 @@ function productCard(p){
       <div class="absolute inset-0 bg-gradient-to-t from-maroon-dark/40 via-transparent to-transparent"></div>
       <div class="card-added-check absolute inset-0 flex items-center justify-center bg-maroon-dark/50 opacity-0 pointer-events-none">
         <span class="material-symbols-outlined text-gold-light text-[36px] sm:text-[44px]">check_circle</span>
+      </div>
+      <div class="hidden lg:flex quick-view-overlay absolute inset-0 items-center justify-center bg-maroon-dark/0 group-hover:bg-maroon-dark/35 transition-colors duration-300">
+        <span class="quick-view-btn opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300 bg-ivory text-maroon font-label text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-full shadow-premium flex items-center gap-2 view-btn" data-id="${p.id}">
+          <span class="material-symbols-outlined text-[16px]">visibility</span>Quick View
+        </span>
       </div>
     </div>
     <div class="p-2.5 sm:p-4 md:p-5">
@@ -1485,17 +1510,17 @@ function renderHome(){
   document.getElementById('homeCategories').innerHTML = CATS.map((c,i)=>{
     const meta = catMeta[c] || {icon:"local_fire_department", img:"https://images.unsplash.com/photo-1573812461383-e5f8b759d12e?w=500&auto=format&fit=crop&q=80"};
     const count = PRODUCTS.filter(p=>p.cat===c).length;
-    return `<div class="cat-card group relative rounded-xl sm:rounded-2xl overflow-hidden cursor-pointer ring-1 ring-gold/25 hover:ring-gold shadow-[0_10px_30px_-10px_rgba(0,0,0,0.4)] hover:shadow-[0_25px_50px_-12px_rgba(212,175,55,0.35)] transition-all duration-500 h-40 sm:h-56 lg:h-64 w-[42vw] shrink-0 sm:w-auto" data-cat="${esc(c)}">
+    return `<div class="cat-card group relative rounded-xl sm:rounded-2xl overflow-hidden cursor-pointer ring-1 ring-gold/25 hover:ring-gold shadow-[0_10px_30px_-10px_rgba(0,0,0,0.4)] hover:shadow-[0_25px_50px_-12px_rgba(212,175,55,0.35)] transition-all duration-500 h-40 sm:h-56 lg:h-80 w-[42vw] shrink-0 sm:w-auto" data-cat="${esc(c)}">
       <img src="${meta.img}" class="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"/>
       <div class="absolute inset-0 bg-gradient-to-t from-maroon-dark/95 via-maroon-dark/50 to-maroon-dark/10 group-hover:from-maroon-dark/90 transition-all"></div>
       <div class="absolute inset-0 border border-gold/0 group-hover:border-gold/40 rounded-2xl transition-all duration-500"></div>
-      <span class="absolute top-4 right-4 font-label text-[10px] font-bold text-gold-light bg-ivory/10 backdrop-blur-sm px-2.5 py-1 rounded-full ring-1 ring-gold/30">${count} items</span>
-      <div class="absolute inset-x-0 bottom-0 p-5 flex flex-col gap-2">
-        <span class="w-11 h-11 rounded-full bg-gold-gradient flex items-center justify-center shadow-gold group-hover:scale-110 transition-transform duration-500">
-          <span class="material-symbols-outlined text-maroon-dark text-[22px]">${meta.icon}</span>
+      <span class="absolute top-4 right-4 font-label text-[10px] lg:text-xs font-bold text-gold-light bg-ivory/10 backdrop-blur-sm px-2.5 py-1 lg:px-3 lg:py-1.5 rounded-full ring-1 ring-gold/30">${count} items</span>
+      <div class="absolute inset-x-0 bottom-0 p-5 lg:p-6 flex flex-col gap-2 lg:gap-3">
+        <span class="w-11 h-11 lg:w-14 lg:h-14 rounded-full bg-gold-gradient flex items-center justify-center shadow-gold group-hover:scale-110 transition-transform duration-500">
+          <span class="material-symbols-outlined text-maroon-dark text-[22px] lg:text-[28px]">${meta.icon}</span>
         </span>
-        <span class="font-display text-lg font-semibold text-ivory leading-tight">${c}</span>
-        <span class="flex items-center gap-1 font-label text-[11px] font-bold text-gold-light uppercase tracking-wider opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all duration-300">
+        <span class="font-display text-lg lg:text-2xl font-semibold text-ivory leading-tight">${c}</span>
+        <span class="flex items-center gap-1 font-label text-[11px] lg:text-xs font-bold text-gold-light uppercase tracking-wider opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0 transition-all duration-300">
           Explore <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
         </span>
       </div>
@@ -1734,6 +1759,15 @@ function openProduct(id){
   document.getElementById('pdPrice').textContent = '₹'+p.price.toLocaleString('en-IN');
   document.getElementById('pdDesc').textContent = p.fullDesc || p.desc;
   document.getElementById('pdQty').textContent = pdQty;
+
+  const badge = document.getElementById('pdStockBadge');
+  if(typeof p.stockQty === 'number' && p.stockQty > 0 && p.stockQty <= 5){
+    badge.textContent = `Only ${p.stockQty} left in stock`;
+    badge.className = 'mb-3 sm:mb-6 inline-flex items-center gap-1.5 text-xs font-label font-bold text-copper bg-cream px-3 py-1.5 rounded-full w-max';
+  } else {
+    badge.classList.add('hidden');
+  }
+
   showPage('product');
 }
 document.getElementById('pdQtyMinus').addEventListener('click',()=>{
@@ -1839,6 +1873,28 @@ function getOrders(){
 function saveOrders(orders){
   try{ localStorage.setItem(ORDERS_KEY, JSON.stringify(orders)); } catch(e){}
 }
+
+/* ---- Sync order to Supabase (best-effort, doesn't block checkout) ---- */
+async function syncOrderToSupabase(order){
+  if(!supabaseClient) return;
+  try{
+    const phone = (typeof verifiedPhone !== 'undefined' && verifiedPhone) ? verifiedPhone : (order.shipping && order.shipping.phone) || '';
+    await supabaseClient.from('orders').insert({
+      id: order.id,
+      phone: phone,
+      shipping: order.shipping,
+      items: order.items,
+      subtotal: order.subtotal,
+      tax: order.tax,
+      total: order.total,
+      payment_method: order.paymentMethod,
+      status: 'Processing'
+    });
+  } catch(e){
+    console.error('Could not sync order to Supabase (order still saved locally).', e);
+  }
+}
+
 function statusForOrder(order){
   const daysSince = (Date.now() - order.createdAt) / (1000*60*60*24);
   if(daysSince > 5) return 'Delivered';
@@ -1902,6 +1958,7 @@ document.getElementById('placeOrderBtn').addEventListener('click',()=>{
   const orders = getOrders();
   orders.unshift(order);
   saveOrders(orders);
+  syncOrderToSupabase(order);
 
   document.getElementById('confOrderId').textContent = orderId;
   cart = {}; promoDiscount = 0;
@@ -2210,6 +2267,7 @@ document.getElementById('ourStoryLink').addEventListener('click',e=>{ e.preventD
 document.getElementById('returnPolicyLink').addEventListener('click',e=>{ e.preventDefault(); showPage('returns'); });
 document.getElementById('returnsContactBtn').addEventListener('click',()=>showPage('contact'));
 document.getElementById('aboutShopBtn').addEventListener('click',()=>showPage('shop'));
+document.getElementById('viewAllProductsBtn').addEventListener('click',()=>{ activeCat='All'; showPage('shop'); renderShop(); });
 document.getElementById('contactForm').addEventListener('submit',e=>{
   e.preventDefault();
   const form = e.target;
@@ -2446,6 +2504,39 @@ showPage('home');
 renderHome();
 renderShop();
 updateCartCount();
+
+/* ---- Live product sync from Supabase (progressive enhancement) ---- */
+async function loadProductsFromSupabase(){
+  if(!supabaseClient) return; // not configured yet — site keeps using the built-in fallback products
+  try{
+    const { data, error } = await supabaseClient
+      .from('products')
+      .select('*')
+      .gt('stock_qty', 0)
+      .order('created_at', { ascending: true });
+    if(error || !data || data.length === 0) return;
+
+    PRODUCTS = data.map(row => ({
+      id: row.id,
+      name: row.name,
+      cat: row.category,
+      desc: row.desc_short,
+      fullDesc: row.full_desc || row.desc_short,
+      price: Number(row.price),
+      img: row.image_url,
+      stockQty: row.stock_qty
+    }));
+    CATS.length = 0;
+    CATS.push(...new Set(PRODUCTS.map(p=>p.cat)));
+
+    // re-render whatever the person is currently looking at
+    renderHome();
+    renderShop();
+  } catch(e){
+    console.error('Could not load products from Supabase, using fallback list.', e);
+  }
+}
+loadProductsFromSupabase();
 
 </script>
 </body>
