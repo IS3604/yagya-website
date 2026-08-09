@@ -1945,6 +1945,47 @@ async function deductStockForOrder(order){
   }
 }
 
+/* ---- Customer record (keyed by phone) — remembers shipping details across visits/devices ---- */
+let savedCustomerData = null;
+
+async function lookupCustomerAndPrefill(phone){
+  if(!supabaseClient || !phone) return;
+  try{
+    const { data, error } = await supabaseClient.from('customers').select('*').eq('phone', phone).maybeSingle();
+    if(error || !data) return;
+    savedCustomerData = data;
+    // pre-fill the shipping form if it's present on screen (payment page)
+    const sName = document.getElementById('sName');
+    if(sName){
+      document.getElementById('sName').value = data.name || '';
+      document.getElementById('sAddress').value = data.address || '';
+      document.getElementById('sCity').value = data.city || '';
+      document.getElementById('sPin').value = data.pin || '';
+      document.getElementById('sEmail').value = data.email || '';
+      showToast('Welcome back! Your details have been filled in.');
+    }
+  } catch(e){
+    console.error('Could not look up customer record.', e);
+  }
+}
+
+async function saveCustomerRecord(phone, shipping){
+  if(!supabaseClient || !phone) return;
+  try{
+    await supabaseClient.from('customers').upsert({
+      phone: phone,
+      name: shipping.name,
+      address: shipping.address,
+      city: shipping.city,
+      pin: shipping.pin,
+      email: shipping.email,
+      updated_at: new Date().toISOString()
+    });
+  } catch(e){
+    console.error('Could not save customer record.', e);
+  }
+}
+
 function statusForOrder(order){
   const daysSince = (Date.now() - order.createdAt) / (1000*60*60*24);
   if(daysSince > 5) return 'Delivered';
@@ -2010,6 +2051,8 @@ document.getElementById('placeOrderBtn').addEventListener('click',()=>{
   saveOrders(orders);
   syncOrderToSupabase(order);
   deductStockForOrder(order);
+  const phoneForRecord = (typeof verifiedPhone !== 'undefined' && verifiedPhone) ? verifiedPhone : order.shipping.phone;
+  saveCustomerRecord(phoneForRecord, order.shipping);
 
   document.getElementById('confOrderId').textContent = orderId;
   cart = {}; promoDiscount = 0;
@@ -2060,10 +2103,44 @@ function playOrderConfirmationAnimation(){
   }
 }
 
-function renderOrders(){
-  const orders = getOrders();
+function effectiveStatus(order){
+  return order.dbStatus || statusForOrder(order);
+}
+
+async function renderOrders(){
   const list = document.getElementById('ordersList');
   const empty = document.getElementById('ordersEmpty');
+
+  let orders = getOrders(); // instant fallback so the page never looks empty while loading
+
+  if(supabaseClient && typeof verifiedPhone !== 'undefined' && verifiedPhone){
+    list.innerHTML = '<p class="text-center text-ink-soft text-sm py-10">Loading your orders…</p>';
+    empty.classList.add('hidden');
+    try{
+      const { data, error } = await supabaseClient
+        .from('orders')
+        .select('*')
+        .eq('phone', verifiedPhone)
+        .order('created_at', { ascending: false });
+      if(!error && data){
+        orders = data.map(row => ({
+          id: row.id,
+          createdAt: new Date(row.created_at).getTime(),
+          items: row.items,
+          subtotal: Number(row.subtotal),
+          tax: Number(row.tax),
+          total: Number(row.total),
+          paymentMethod: row.payment_method,
+          shipping: row.shipping,
+          returns: row.returns || {},
+          dbStatus: row.status
+        }));
+      }
+    } catch(e){
+      console.error('Could not load orders from Supabase, showing locally saved orders instead.', e);
+    }
+  }
+
   if(orders.length === 0){
     list.innerHTML = '';
     empty.classList.remove('hidden');
@@ -2071,7 +2148,7 @@ function renderOrders(){
   }
   empty.classList.add('hidden');
   list.innerHTML = orders.map(order=>{
-    const status = statusForOrder(order);
+    const status = effectiveStatus(order);
     const stepIdx = STATUS_STEPS.indexOf(status);
     const dateStr = new Date(order.createdAt).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' });
     const previewItems = order.items.slice(0,3);
@@ -2080,7 +2157,7 @@ function renderOrders(){
     const deadlineStr = new Date(returnDeadline).toLocaleDateString('en-IN', { day:'numeric', month:'short' });
 
     const statusPill = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-label font-bold uppercase tracking-wide ${status==='Delivered' ? 'bg-cream text-copper' : status==='Shipped' ? 'bg-gold/20 text-gold-dark' : 'bg-maroon/10 text-maroon'}">
-      <span class="material-symbols-outlined text-[13px] sm:text-[15px]">${STATUS_ICON[status]}</span>${status}
+      <span class="material-symbols-outlined text-[13px] sm:text-[15px]">${STATUS_ICON[status] || 'info'}</span>${status}
     </span>`;
 
     const stepper = STATUS_STEPS.map((s,i)=>`
@@ -2521,6 +2598,7 @@ document.getElementById('otpVerifyBtn').addEventListener('click', ()=>{
     setTimeout(()=>{
       closeOtpModal();
       showToast('Number verified successfully');
+      lookupCustomerAndPrefill(verifiedPhone);
       if(otpPendingAction){ const action = otpPendingAction; otpPendingAction = null; action(); }
     }, 1300);
   } else {
@@ -2560,13 +2638,23 @@ updateCartCount();
 async function loadCategoriesFromSupabase(){
   if(!supabaseClient) return;
   try{
-    const { data, error } = await supabaseClient.from('categories').select('*');
-    if(error || !data || data.length === 0) return;
+    const { data, error } = await supabaseClient.from('categories').select('*').order('created_at', { ascending: true });
+    if(error || !data) return;
     const meta = {};
     data.forEach(row => {
       meta[row.name] = { icon: row.icon || 'category', img: row.image_url || '' };
     });
     SUPABASE_CAT_META = meta;
+
+    // Categories table is the source of truth for which categories exist —
+    // union with any category names already in use by products, so nothing gets dropped either way.
+    const namesFromCategories = data.map(row => row.name);
+    const merged = new Set([...CATS, ...namesFromCategories]);
+    CATS.length = 0;
+    CATS.push(...merged);
+
+    renderHome();
+    renderShop();
   } catch(e){
     console.error('Could not load categories from Supabase, using fallback icons.', e);
   }
@@ -2595,8 +2683,6 @@ async function loadProductsFromSupabase(){
     CATS.length = 0;
     CATS.push(...new Set(PRODUCTS.map(p=>p.cat)));
 
-    await loadCategoriesFromSupabase();
-
     // re-render whatever the person is currently looking at
     renderHome();
     renderShop();
@@ -2605,6 +2691,7 @@ async function loadProductsFromSupabase(){
   }
 }
 loadProductsFromSupabase();
+loadCategoriesFromSupabase();
 
 </script>
 </body>
