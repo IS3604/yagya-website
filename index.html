@@ -358,6 +358,13 @@ backgroundImage:{
     position:absolute; width:1px; height:1px; padding:0; margin:-1px;
     overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
   }
+
+  /* Lightbox nav arrows: desktop-only (mobile uses swipe instead) */
+  #lightboxPrev, #lightboxNext{ display: none !important; }
+  @media (min-width: 640px){
+    #lightboxOverlay[data-multi="true"] #lightboxPrev,
+    #lightboxOverlay[data-multi="true"] #lightboxNext{ display: flex !important; }
+  }
 </style>
 </head>
 <body class="font-body text-ink">
@@ -456,10 +463,10 @@ backgroundImage:{
 <button id="lightboxClose" class="absolute top-4 right-4 sm:top-6 sm:right-6 text-ivory hover:text-gold-light transition-colors z-10">
 <span class="material-symbols-outlined text-[28px] sm:text-[32px]">close</span>
 </button>
-<button id="lightboxPrev" class="hidden absolute left-2 sm:left-6 top-1/2 -translate-y-1/2 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-ivory/10 hover:bg-ivory/20 text-ivory items-center justify-center transition-colors">
+<button id="lightboxPrev" class="absolute left-2 sm:left-6 top-1/2 -translate-y-1/2 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-ivory/10 hover:bg-ivory/20 text-ivory items-center justify-center transition-colors">
 <span class="material-symbols-outlined text-[24px] sm:text-[28px]">chevron_left</span>
 </button>
-<button id="lightboxNext" class="hidden absolute right-2 sm:right-6 top-1/2 -translate-y-1/2 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-ivory/10 hover:bg-ivory/20 text-ivory items-center justify-center transition-colors">
+<button id="lightboxNext" class="absolute right-2 sm:right-6 top-1/2 -translate-y-1/2 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-ivory/10 hover:bg-ivory/20 text-ivory items-center justify-center transition-colors">
 <span class="material-symbols-outlined text-[24px] sm:text-[28px]">chevron_right</span>
 </button>
 <img id="lightboxImg" src="" class="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl"/>
@@ -1942,13 +1949,9 @@ function closeLightbox(){
 function updateLightboxImage(){
   document.getElementById('lightboxImg').src = currentGalleryImages[lightboxIndex];
   const multi = currentGalleryImages.length > 1;
-  const prevBtn = document.getElementById('lightboxPrev');
-  const nextBtn = document.getElementById('lightboxNext');
+  const overlay = document.getElementById('lightboxOverlay');
   const counter = document.getElementById('lightboxCounter');
-  prevBtn.classList.toggle('hidden', !multi);
-  prevBtn.classList.toggle('flex', multi);
-  nextBtn.classList.toggle('hidden', !multi);
-  nextBtn.classList.toggle('flex', multi);
+  overlay.dataset.multi = multi ? 'true' : 'false';
   if(multi){
     counter.textContent = (lightboxIndex+1) + ' / ' + currentGalleryImages.length;
     counter.classList.remove('hidden');
@@ -1970,6 +1973,30 @@ document.addEventListener('keydown', (e)=>{
   if(e.key === 'ArrowRight') lightboxGoNext();
   if(e.key === 'ArrowLeft') lightboxGoPrev();
 });
+
+/* Swipe left/right to change image on mobile */
+(function(){
+  const overlay = document.getElementById('lightboxOverlay');
+  let touchStartX = 0, touchDeltaX = 0, isSwiping = false;
+  overlay.addEventListener('touchstart', (e)=>{
+    touchStartX = e.touches[0].clientX;
+    touchDeltaX = 0;
+    isSwiping = true;
+  }, { passive: true });
+  overlay.addEventListener('touchmove', (e)=>{
+    if(!isSwiping) return;
+    touchDeltaX = e.touches[0].clientX - touchStartX;
+  }, { passive: true });
+  overlay.addEventListener('touchend', ()=>{
+    if(!isSwiping) return;
+    isSwiping = false;
+    const threshold = 40;
+    if(currentGalleryImages.length <= 1) return;
+    if(touchDeltaX <= -threshold) lightboxGoNext();
+    else if(touchDeltaX >= threshold) lightboxGoPrev();
+  });
+})();
+
 document.getElementById('pdQtyMinus').addEventListener('click',()=>{
   pdQty = Math.max(1, pdQty-1);
   document.getElementById('pdQty').textContent = pdQty;
