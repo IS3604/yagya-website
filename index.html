@@ -451,6 +451,21 @@ backgroundImage:{
 </div>
 </div>
 
+<!-- IMAGE LIGHTBOX -->
+<div id="lightboxOverlay" class="hidden fixed inset-0 z-[9995] bg-maroon-dark/95 backdrop-blur-sm flex items-center justify-center px-4 py-8">
+<button id="lightboxClose" class="absolute top-4 right-4 sm:top-6 sm:right-6 text-ivory hover:text-gold-light transition-colors z-10">
+<span class="material-symbols-outlined text-[28px] sm:text-[32px]">close</span>
+</button>
+<button id="lightboxPrev" class="hidden absolute left-2 sm:left-6 top-1/2 -translate-y-1/2 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-ivory/10 hover:bg-ivory/20 text-ivory items-center justify-center transition-colors">
+<span class="material-symbols-outlined text-[24px] sm:text-[28px]">chevron_left</span>
+</button>
+<button id="lightboxNext" class="hidden absolute right-2 sm:right-6 top-1/2 -translate-y-1/2 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-ivory/10 hover:bg-ivory/20 text-ivory items-center justify-center transition-colors">
+<span class="material-symbols-outlined text-[24px] sm:text-[28px]">chevron_right</span>
+</button>
+<img id="lightboxImg" src="" class="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl"/>
+<div id="lightboxCounter" class="hidden absolute bottom-6 left-1/2 -translate-x-1/2 text-ivory/70 font-label text-xs font-semibold tracking-wide"></div>
+</div>
+
 <div id="promoBanner" class="fixed top-0 w-full z-[51] bg-maroon-gradient text-ivory overflow-hidden h-9 flex items-center border-b border-gold/30">
 <div class="ticker-track flex items-center gap-16 whitespace-nowrap font-label text-xs font-semibold tracking-wide">
 <span class="flex items-center gap-2"><span class="material-symbols-outlined text-[15px] text-gold-light">local_shipping</span> Free shipping on orders above ₹999</span>
@@ -679,7 +694,7 @@ Back to Shop
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-10 lg:gap-14 items-start">
 <div class="relative">
 <div class="hidden sm:block absolute w-full h-full rounded-2xl bg-gold-gradient opacity-15 blur-2xl -z-10"></div>
-<div class="rounded-xl sm:rounded-2xl overflow-hidden ring-1 ring-gold/25 shadow-premium">
+<div class="rounded-xl sm:rounded-2xl overflow-hidden ring-1 ring-gold/25 shadow-premium cursor-pointer" id="pdImageWrap">
 <img id="pdImage" class="w-full h-[220px] sm:h-[340px] md:h-[420px] lg:h-[560px] object-cover" src="" alt=""/>
 </div>
 <div id="pdThumbnails" class="hidden grid-cols-5 gap-2 mt-3"></div>
@@ -1811,12 +1826,16 @@ function joinNewsletter(){
 /* ---- Product detail page ---- */
 let currentProductId = null;
 let pdQty = 1;
+let currentGalleryImages = [];
+let currentPdImageIndex = 0;
 function openProduct(id){
   const p = PRODUCTS.find(pp=>pp.id===id);
   if(!p) return;
   currentProductId = id;
   pdQty = 1;
   const gallery = (p.images && p.images.length) ? p.images : [p.img];
+  currentGalleryImages = gallery;
+  currentPdImageIndex = 0;
   document.getElementById('pdImage').src = gallery[0];
   document.getElementById('pdImage').alt = p.name;
   document.getElementById('pdCat').textContent = p.cat;
@@ -1830,13 +1849,14 @@ function openProduct(id){
   const thumbs = document.getElementById('pdThumbnails');
   if(gallery.length > 1){
     thumbs.innerHTML = gallery.map((url, i) => `
-      <button class="pd-thumb-btn rounded-lg overflow-hidden ring-2 ${i===0 ? 'ring-gold' : 'ring-transparent'} aspect-square" data-url="${url}">
+      <button class="pd-thumb-btn rounded-lg overflow-hidden ring-2 ${i===0 ? 'ring-gold' : 'ring-transparent'} aspect-square" data-url="${url}" data-idx="${i}">
         <img src="${url}" class="w-full h-full object-cover"/>
       </button>`).join('');
     thumbs.classList.remove('hidden');
     thumbs.classList.add('grid');
     thumbs.querySelectorAll('.pd-thumb-btn').forEach(btn=>{
       btn.addEventListener('click', ()=>{
+        currentPdImageIndex = Number(btn.dataset.idx);
         document.getElementById('pdImage').src = btn.dataset.url;
         thumbs.querySelectorAll('.pd-thumb-btn').forEach(b=> b.classList.remove('ring-gold'));
         thumbs.querySelectorAll('.pd-thumb-btn').forEach(b=> b.classList.add('ring-transparent'));
@@ -1901,6 +1921,55 @@ function openProduct(id){
 
   showPage('product');
 }
+
+/* ---- Image lightbox ---- */
+let lightboxIndex = 0;
+function openLightbox(startIndex){
+  if(currentGalleryImages.length === 0) return;
+  lightboxIndex = startIndex || 0;
+  updateLightboxImage();
+  const overlay = document.getElementById('lightboxOverlay');
+  overlay.classList.remove('hidden');
+  overlay.classList.add('flex');
+  document.body.style.overflow = 'hidden';
+}
+function closeLightbox(){
+  const overlay = document.getElementById('lightboxOverlay');
+  overlay.classList.add('hidden');
+  overlay.classList.remove('flex');
+  document.body.style.overflow = '';
+}
+function updateLightboxImage(){
+  document.getElementById('lightboxImg').src = currentGalleryImages[lightboxIndex];
+  const multi = currentGalleryImages.length > 1;
+  const prevBtn = document.getElementById('lightboxPrev');
+  const nextBtn = document.getElementById('lightboxNext');
+  const counter = document.getElementById('lightboxCounter');
+  prevBtn.classList.toggle('hidden', !multi);
+  prevBtn.classList.toggle('flex', multi);
+  nextBtn.classList.toggle('hidden', !multi);
+  nextBtn.classList.toggle('flex', multi);
+  if(multi){
+    counter.textContent = (lightboxIndex+1) + ' / ' + currentGalleryImages.length;
+    counter.classList.remove('hidden');
+  } else {
+    counter.classList.add('hidden');
+  }
+}
+function lightboxGoNext(){ lightboxIndex = (lightboxIndex+1) % currentGalleryImages.length; updateLightboxImage(); }
+function lightboxGoPrev(){ lightboxIndex = (lightboxIndex-1+currentGalleryImages.length) % currentGalleryImages.length; updateLightboxImage(); }
+
+document.getElementById('pdImageWrap').addEventListener('click', ()=> openLightbox(currentPdImageIndex));
+document.getElementById('lightboxClose').addEventListener('click', closeLightbox);
+document.getElementById('lightboxOverlay').addEventListener('click', (e)=>{ if(e.target.id === 'lightboxOverlay') closeLightbox(); });
+document.getElementById('lightboxNext').addEventListener('click', lightboxGoNext);
+document.getElementById('lightboxPrev').addEventListener('click', lightboxGoPrev);
+document.addEventListener('keydown', (e)=>{
+  if(document.getElementById('lightboxOverlay').classList.contains('hidden')) return;
+  if(e.key === 'Escape') closeLightbox();
+  if(e.key === 'ArrowRight') lightboxGoNext();
+  if(e.key === 'ArrowLeft') lightboxGoPrev();
+});
 document.getElementById('pdQtyMinus').addEventListener('click',()=>{
   pdQty = Math.max(1, pdQty-1);
   document.getElementById('pdQty').textContent = pdQty;
