@@ -19,6 +19,7 @@
 <meta name="twitter:image" content="https://is3604.github.io/yagya-website/og-image.png"/>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <script>
 tailwind.config={darkMode:"class",theme:{extend:{
 colors:{
@@ -1056,7 +1057,25 @@ Promo Code
 
 <div class="w-full lg:w-2/3 flex flex-col gap-4 sm:gap-6 lg:gap-8">
 <div class="bg-ivory rounded-xl sm:rounded-2xl shadow-card ring-1 ring-gold/20 p-4 sm:p-6 lg:p-8">
-<h2 class="font-display text-base sm:text-xl text-maroon font-semibold mb-3 sm:mb-6 flex items-center gap-2"><span class="material-symbols-outlined text-copper text-[18px] sm:text-[24px]">local_shipping</span> Shipping Details</h2>
+<div class="flex items-center justify-between mb-3 sm:mb-6">
+<h2 class="font-display text-base sm:text-xl text-maroon font-semibold flex items-center gap-2"><span class="material-symbols-outlined text-copper text-[18px] sm:text-[24px]">local_shipping</span> Shipping Details</h2>
+<button type="button" id="editAddressBtn" class="hidden text-maroon text-xs sm:text-sm font-label font-bold uppercase tracking-wide items-center gap-1 hover:text-maroon-light">
+<span class="material-symbols-outlined text-[16px]">edit</span>Edit
+</button>
+</div>
+
+<!-- Minimized summary (shown once an address is filled/saved) -->
+<div id="shippingSummaryView" class="hidden bg-cream rounded-xl p-4 cursor-pointer hover:bg-cream/70 transition-colors" >
+<div class="flex items-start gap-3">
+<span class="material-symbols-outlined text-copper text-[20px] mt-0.5">location_on</span>
+<div class="min-w-0">
+<div id="summaryName" class="font-label font-bold text-sm text-ink"></div>
+<div id="summaryAddress" class="text-xs sm:text-sm text-ink-soft mt-0.5"></div>
+<div id="summaryContact" class="text-xs sm:text-sm text-ink-soft mt-1 flex flex-wrap gap-x-3"></div>
+</div>
+</div>
+</div>
+
 <form id="shippingForm" class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-5">
 <input id="sName" required class="bg-cream border-b-2 border-gold/30 focus:border-maroon px-3 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base rounded-t-lg focus:outline-none transition-colors md:col-span-2" placeholder="Full Name" type="text"/>
 <input id="sAddress" required class="bg-cream border-b-2 border-gold/30 focus:border-maroon px-3 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base rounded-t-lg focus:outline-none transition-colors md:col-span-2" placeholder="Address Line" type="text"/>
@@ -1071,28 +1090,18 @@ Promo Code
 <h2 class="font-display text-base sm:text-xl text-maroon font-semibold mb-3 sm:mb-6 flex items-center gap-2"><span class="material-symbols-outlined text-copper text-[18px] sm:text-[24px]">credit_card</span> Payment Method</h2>
 <div class="flex flex-col gap-2 sm:gap-3 mb-3 sm:mb-6" id="paymentMethods">
 <label class="flex items-center gap-2.5 sm:gap-3 bg-cream rounded-lg sm:rounded-xl px-3 py-2.5 sm:px-4 sm:py-3 cursor-pointer ring-1 ring-gold/20 has-[:checked]:ring-maroon has-[:checked]:bg-cream/70">
-<input type="radio" name="paymethod" value="card" checked class="accent-maroon"/>
+<input type="radio" name="paymethod" value="online" checked class="accent-maroon"/>
 <span class="material-symbols-outlined text-copper text-[18px] sm:text-[24px]">credit_card</span>
-<span class="font-label text-xs sm:text-sm font-semibold text-ink">Credit / Debit Card</span>
-</label>
-<label class="flex items-center gap-2.5 sm:gap-3 bg-cream rounded-lg sm:rounded-xl px-3 py-2.5 sm:px-4 sm:py-3 cursor-pointer ring-1 ring-gold/20 has-[:checked]:ring-maroon has-[:checked]:bg-cream/70">
-<input type="radio" name="paymethod" value="upi" class="accent-maroon"/>
-<span class="material-symbols-outlined text-copper text-[18px] sm:text-[24px]">smartphone</span>
-<span class="font-label text-xs sm:text-sm font-semibold text-ink">UPI</span>
+<div class="flex-1">
+<span class="font-label text-xs sm:text-sm font-semibold text-ink block">Pay Online</span>
+<span class="text-[10px] sm:text-xs text-ink-soft">Card, UPI, Netbanking &amp; Wallets via Razorpay</span>
+</div>
 </label>
 <label class="flex items-center gap-2.5 sm:gap-3 bg-cream rounded-lg sm:rounded-xl px-3 py-2.5 sm:px-4 sm:py-3 cursor-pointer ring-1 ring-gold/20 has-[:checked]:ring-maroon has-[:checked]:bg-cream/70">
 <input type="radio" name="paymethod" value="cod" class="accent-maroon"/>
 <span class="material-symbols-outlined text-copper text-[18px] sm:text-[24px]">payments</span>
 <span class="font-label text-xs sm:text-sm font-semibold text-ink">Cash on Delivery</span>
 </label>
-</div>
-<div id="cardFields" class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-5">
-<input class="bg-cream border-b-2 border-gold/30 focus:border-maroon px-3 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base rounded-t-lg focus:outline-none transition-colors md:col-span-2" placeholder="Card Number" type="text" maxlength="19"/>
-<input class="bg-cream border-b-2 border-gold/30 focus:border-maroon px-3 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base rounded-t-lg focus:outline-none transition-colors" placeholder="MM/YY" type="text"/>
-<input class="bg-cream border-b-2 border-gold/30 focus:border-maroon px-3 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base rounded-t-lg focus:outline-none transition-colors" placeholder="CVV" type="text" maxlength="4"/>
-</div>
-<div id="upiFields" class="hidden">
-<input class="bg-cream border-b-2 border-gold/30 focus:border-maroon px-3 py-2.5 sm:px-4 sm:py-3 text-sm sm:text-base rounded-t-lg focus:outline-none transition-colors w-full" placeholder="UPI ID (e.g. name@bank)" type="text"/>
 </div>
 </div>
 
@@ -1377,6 +1386,11 @@ if (SUPABASE_URL !== 'YOUR_SUPABASE_URL' && SUPABASE_ANON_KEY !== 'YOUR_SUPABASE
     }
   });
 }
+
+/* ============================================================
+   RAZORPAY CONFIG — public Key ID only, never the Key Secret
+   ============================================================ */
+const RAZORPAY_KEY_ID = 'rzp_live_TQwGMXKtj3BVvt';
 
 let PRODUCTS = [
  {id:1,name:"Pure Gir Cow Ghee",cat:"Sattvic",desc:"500ml Glass Jar",price:1250,img:"https://images.unsplash.com/photo-1573812461383-e5f8b759d12e?w=600&auto=format&fit=crop&q=80",
@@ -1823,7 +1837,7 @@ function renderCart(){
 
 function checkout(){
   if(Object.keys(cart).length===0){ showToast('Your cart is empty'); return; }
-  requireOtpAuth(()=> showPage('payment'));
+  requireOtpAuth(()=>{ showPage('payment'); showAddressSummary(); });
 }
 function joinNewsletter(){
   const v=document.getElementById('newsletterEmail').value.trim();
@@ -2020,7 +2034,7 @@ document.getElementById('pdBuyNowBtn').addEventListener('click',()=>{
   cart[currentProductId] = (cart[currentProductId]||0) + pdQty;
   updateCartCount();
   renderCart();
-  requireOtpAuth(()=> showPage('payment'));
+  requireOtpAuth(()=>{ showPage('payment'); showAddressSummary(); });
 });
 
 function burstAtCart(){
@@ -2057,13 +2071,6 @@ function burstAtCart(){
 document.getElementById('backToShopBtn').addEventListener('click',()=>showPage('shop'));
 
 /* ---- Payment page ---- */
-document.querySelectorAll('input[name="paymethod"]').forEach(r=>{
-  r.addEventListener('change',()=>{
-    const v = document.querySelector('input[name="paymethod"]:checked').value;
-    document.getElementById('cardFields').classList.toggle('hidden', v!=='card');
-    document.getElementById('upiFields').classList.toggle('hidden', v!=='upi');
-  });
-});
 function renderPayment(){
   const ids = Object.keys(cart);
   const list = document.getElementById('paymentItemsList');
@@ -2090,7 +2097,7 @@ function renderPayment(){
 document.getElementById('backToCartBtn').addEventListener('click',()=>showPage('cart'));
 
 /* ---- Sync order to Supabase (this is now the only place orders live) ---- */
-async function syncOrderToSupabase(order){
+async function syncOrderToSupabase(order, razorpayPaymentId){
   if(!supabaseClient) return false;
   try{
     const phone = (typeof verifiedPhone !== 'undefined' && verifiedPhone) ? verifiedPhone : (order.shipping && order.shipping.phone) || '';
@@ -2104,6 +2111,7 @@ async function syncOrderToSupabase(order){
       tax: order.tax,
       total: order.total,
       payment_method: order.paymentMethod,
+      razorpay_payment_id: razorpayPaymentId || null,
       status: 'Processing'
     });
     if(error){ console.error('Could not save order to Supabase.', error); return false; }
@@ -2150,6 +2158,9 @@ let savedCustomerData = null;
 
 async function lookupCustomerAndPrefill(phone){
   if(!supabaseClient || !phone) return;
+  const sPhoneField = document.getElementById('sPhone');
+  if(sPhoneField && !sPhoneField.value) sPhoneField.value = phone; // always fill phone, we already know it from OTP
+
   try{
     const { data, error } = await supabaseClient.from('customers').select('*').eq('phone', phone).maybeSingle();
     if(error || !data) return;
@@ -2163,11 +2174,47 @@ async function lookupCustomerAndPrefill(phone){
       document.getElementById('sPin').value = data.pin || '';
       document.getElementById('sEmail').value = data.email || '';
       showToast('Welcome back! Your details have been filled in.');
+      showAddressSummary();
     }
   } catch(e){
     console.error('Could not look up customer record.', e);
   }
 }
+
+/* ---- Minimized address summary / edit toggle on the Payment page ---- */
+function showAddressSummary(){
+  const name = document.getElementById('sName').value.trim();
+  const address = document.getElementById('sAddress').value.trim();
+  const city = document.getElementById('sCity').value.trim();
+  const pin = document.getElementById('sPin').value.trim();
+  const phone = document.getElementById('sPhone').value.trim();
+  const email = document.getElementById('sEmail').value.trim();
+
+  // only worth showing a summary once there's an actual address to summarize
+  if(!name || !address){
+    showAddressEditForm();
+    return;
+  }
+
+  document.getElementById('summaryName').textContent = name;
+  document.getElementById('summaryAddress').textContent = `${address}, ${city} - ${pin}`;
+  document.getElementById('summaryContact').innerHTML = `<span>${esc(phone)}</span>${email ? `<span>${esc(email)}</span>` : ''}`;
+
+  document.getElementById('shippingSummaryView').classList.remove('hidden');
+  document.getElementById('shippingForm').classList.add('hidden');
+  const editBtn = document.getElementById('editAddressBtn');
+  editBtn.classList.remove('hidden');
+  editBtn.classList.add('flex');
+}
+function showAddressEditForm(){
+  document.getElementById('shippingSummaryView').classList.add('hidden');
+  document.getElementById('shippingForm').classList.remove('hidden');
+  const editBtn = document.getElementById('editAddressBtn');
+  editBtn.classList.add('hidden');
+  editBtn.classList.remove('flex');
+}
+document.getElementById('shippingSummaryView').addEventListener('click', showAddressEditForm);
+document.getElementById('editAddressBtn').addEventListener('click', showAddressEditForm);
 
 async function saveCustomerRecord(phone, shipping){
   if(!supabaseClient || !phone) return;
@@ -2222,10 +2269,17 @@ document.getElementById('placeOrderBtn').addEventListener('click', async ()=>{
   if(!supabaseClient){ showToast('Ordering is temporarily unavailable — please try again shortly.'); return; }
 
   const placeBtn = document.getElementById('placeOrderBtn');
-  placeBtn.disabled = true;
-  placeBtn.classList.add('opacity-60','pointer-events-none');
   const originalBtnHtml = placeBtn.innerHTML;
-  placeBtn.innerHTML = '<span class="material-symbols-outlined text-[20px] animate-spin">progress_activity</span> Placing Order...';
+  function setPlacingState(msg){
+    placeBtn.disabled = true;
+    placeBtn.classList.add('opacity-60','pointer-events-none');
+    placeBtn.innerHTML = `<span class="material-symbols-outlined text-[20px] animate-spin">progress_activity</span> ${msg}`;
+  }
+  function resetButton(){
+    placeBtn.disabled = false;
+    placeBtn.classList.remove('opacity-60','pointer-events-none');
+    placeBtn.innerHTML = originalBtnHtml;
+  }
 
   const ids = Object.keys(cart);
   const items = ids.map(id=>{
@@ -2238,6 +2292,7 @@ document.getElementById('placeOrderBtn').addEventListener('click', async ()=>{
   const tax = discounted*STORE_TAX_RATE;
   const total = discounted+tax;
   const payMethodEl = document.querySelector('input[name="paymethod"]:checked');
+  const paymentMethod = payMethodEl ? payMethodEl.value : 'online';
   const orderId = 'YG' + Math.floor(100000 + Math.random()*900000);
 
   const order = {
@@ -2248,7 +2303,7 @@ document.getElementById('placeOrderBtn').addEventListener('click', async ()=>{
     discount: discountAmount,
     tax: tax,
     total: total,
-    paymentMethod: payMethodEl ? payMethodEl.value : 'card',
+    paymentMethod: paymentMethod,
     shipping: {
       name: document.getElementById('sName').value.trim(),
       address: document.getElementById('sAddress').value.trim(),
@@ -2259,26 +2314,64 @@ document.getElementById('placeOrderBtn').addEventListener('click', async ()=>{
     }
   };
 
-  const saved = await syncOrderToSupabase(order);
-  if(!saved){
-    showToast('Could not place your order — please check your connection and try again.');
-    placeBtn.disabled = false;
-    placeBtn.classList.remove('opacity-60','pointer-events-none');
-    placeBtn.innerHTML = originalBtnHtml;
+  async function finalizeOrder(razorpayPaymentId){
+    setPlacingState('Placing Order...');
+    const saved = await syncOrderToSupabase(order, razorpayPaymentId);
+    if(!saved){
+      showToast('Payment succeeded but we could not save your order — please contact us with your payment ID: ' + (razorpayPaymentId || 'N/A'));
+      resetButton();
+      return;
+    }
+    deductStockForOrder(order);
+    const phoneForRecord = (typeof verifiedPhone !== 'undefined' && verifiedPhone) ? verifiedPhone : order.shipping.phone;
+    saveCustomerRecord(phoneForRecord, order.shipping);
+
+    document.getElementById('confOrderId').textContent = orderId;
+    cart = {}; promoDiscount = 0;
+    updateCartCount();
+    resetButton();
+    showPage('confirmation');
+  }
+
+  if(paymentMethod === 'cod'){
+    setPlacingState('Placing Order...');
+    finalizeOrder(null);
     return;
   }
 
-  deductStockForOrder(order);
-  const phoneForRecord = (typeof verifiedPhone !== 'undefined' && verifiedPhone) ? verifiedPhone : order.shipping.phone;
-  saveCustomerRecord(phoneForRecord, order.shipping);
-
-  document.getElementById('confOrderId').textContent = orderId;
-  cart = {}; promoDiscount = 0;
-  updateCartCount();
-  placeBtn.disabled = false;
-  placeBtn.classList.remove('opacity-60','pointer-events-none');
-  placeBtn.innerHTML = originalBtnHtml;
-  showPage('confirmation');
+  // Card / UPI — route through Razorpay Checkout before creating the order
+  if(!window.Razorpay){
+    showToast('Payment gateway is unavailable right now — please try again shortly.');
+    return;
+  }
+  setPlacingState('Opening Payment...');
+  const rzp = new Razorpay({
+    key: RAZORPAY_KEY_ID,
+    amount: Math.round(total * 100), // paise
+    currency: 'INR',
+    name: 'YAGYA',
+    description: 'Order ' + orderId,
+    prefill: {
+      name: order.shipping.name,
+      email: order.shipping.email,
+      contact: order.shipping.phone
+    },
+    theme: { color: '#7B0D1E' },
+    handler: function(response){
+      finalizeOrder(response.razorpay_payment_id);
+    },
+    modal: {
+      ondismiss: function(){
+        showToast('Payment was not completed — your order has not been placed.');
+        resetButton();
+      }
+    }
+  });
+  rzp.on('payment.failed', function(response){
+    showToast('Payment failed — please try again.');
+    resetButton();
+  });
+  rzp.open();
 });
 document.getElementById('confirmationHomeBtn').addEventListener('click',()=>showPage('home'));
 document.getElementById('confirmationOrdersBtn').addEventListener('click',()=>showPage('orders'));
@@ -2484,7 +2577,7 @@ async function renderOrders(){
           </div>
           <div>
             <div class="font-label text-[10px] font-bold text-copper uppercase tracking-wide mb-1">Payment Method</div>
-            <div class="font-body text-xs sm:text-sm text-ink-soft capitalize">${order.paymentMethod === 'cod' ? 'Cash on Delivery' : order.paymentMethod === 'upi' ? 'UPI' : 'Credit / Debit Card'}</div>
+            <div class="font-body text-xs sm:text-sm text-ink-soft capitalize">${order.paymentMethod === 'cod' ? 'Cash on Delivery' : 'Paid Online'}</div>
           </div>
         </div>
         ${status === 'Delivered' ? `<div class="flex items-center gap-1.5 mt-4 pt-3 border-t border-gold/10"><span class="material-symbols-outlined text-copper text-[14px]">info</span><a class="returns-policy-link font-body text-[10px] sm:text-xs text-ink-soft underline decoration-gold/40 underline-offset-2 cursor-pointer">Read our Returns &amp; Refunds policy</a></div>` : ''}
